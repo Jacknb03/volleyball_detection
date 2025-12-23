@@ -6,7 +6,9 @@
 
 本项目包含两个主要ROS2包：
 - **`mindvision_camera`**: 工业相机驱动包，支持海康威视MindVision系列相机
-- **`station_detector`**: 排球检测与跟踪包，实现基于传统计算机视觉的排球检测、3D位置估计和运动路径预测
+- **`station_detector`**: 排球检测与跟踪包，支持两种检测方案：
+  - **传统方案** (C++): 基于颜色分割+圆形检测
+  - **YOLO方案** (Python): 基于深度学习的YOLO检测，支持多色排球（蓝/黄/白）
 
 ## 主要功能
 
@@ -17,12 +19,25 @@
 - 相机参数动态配置
 
 ### 检测功能 (`station_detector`)
+
+#### 传统方案 (C++)
 - **目标检测**: 基于颜色分割的白色/浅色物体检测
 - **圆形检测**: 使用最小外接圆和椭圆拟合检测排球
 - **3D位置估计**: 基于圆心和半径的深度估计（无需PnP）
 - **卡尔曼滤波**: 位置、速度、加速度的平滑和预测
 - **路径预测**: 基于运动学方程预测未来0.5秒的轨迹
+
+#### YOLO方案 (Python) - 推荐
+- **YOLO检测**: 支持YOLOv5/YOLOv8，自动检测多色排球（蓝/黄/白）
+- **误检过滤**: 通过历史信息和多目标跟踪过滤误检
+- **卡尔曼滤波**: 平滑轨迹，预测未来运动
+- **丢帧处理**: 自动处理丢帧，保持轨迹连续性
+- **3D位置估计**: 基于检测框和相机标定的深度估计
+- **实时性**: 优化推理速度，支持30Hz+处理频率
+
+两种方案都支持：
 - **调试可视化**: 实时调试图像输出和路径可视化
+- **多种测试模式**: 静态图片、视频文件、真实摄像头
 
 ## 项目结构
 
@@ -83,53 +98,60 @@ source install/setup.bash
 
 ### 2. 静态图像测试
 
-适用于快速测试和调试，使用本地图片进行检测：
+#### 传统方案
+```bash
+ros2 launch station_detector static_image_pub.launch.py
+```
+
+#### YOLO方案（推荐）
+```bash
+ros2 launch station_detector yolo_static_image.launch.py
+```
+
+### 3. 视频文件测试
+
+#### 传统方案
+```bash
+ros2 launch station_detector test_video.launch.py
+```
+
+#### YOLO方案（推荐）
+```bash
+ros2 launch station_detector yolo_test_video.launch.py
+```
+
+### 4. 实时相机检测
+
+#### 传统方案
+```bash
+ros2 launch station_detector real_camera.launch.py
+```
+
+#### YOLO方案（推荐）
+```bash
+# 确保已安装Python依赖（包括opencv-python）
+cd src/station_detector
+pip3 install -r requirements.txt
+
+# 启动检测
+ros2 launch station_detector yolo_real_camera.launch.py
+```
+
+### 5. 查看检测结果
 
 ```bash
-# 启动静态图像发布和检测
-ros2 launch station_detector static_image_pub.launch.py
-
-# 在另一个终端查看位姿输出
+# 查看位姿输出
 ros2 topic echo /volleyball_pose
 
 # 查看调试图像
 ros2 run image_tools showimage --ros-args -r image:=/debug_image
 
-# 查看二值化图像
-ros2 run image_tools showimage --ros-args -r image:=/binary_image
-
-# 查看预测路径（RViz2中）
-ros2 run rviz2 rviz2 -d <config_file>
-```
-
-### 3. 实时相机检测
-
-使用真实相机进行实时检测：
-
-```bash
-# 启动相机和检测系统
-ros2 launch station_detector real_camera.launch.py
-
-# 查看检测结果
-ros2 topic echo /volleyball_pose
-
 # 查看发布频率
 ros2 topic hz /volleyball_pose
 
-# 查看话题信息
-ros2 topic info /volleyball_pose
-```
-
-### 4. 视频文件测试
-
-使用视频文件进行测试：
-
-```bash
-# 启动视频播放和检测
-ros2 launch station_detector test_video.launch.py
-
-# 查看检测结果
-ros2 topic echo /volleyball_pose
+# 查看预测轨迹（RViz2中）
+ros2 run rviz2 rviz2
+# 添加MarkerArray显示，订阅 /volleyball_trajectory
 ```
 
 ## 调试方法
@@ -360,8 +382,8 @@ publish_tf: true        # 是否发布TF变换
 
 ## 依赖项
 
-### ROS2包
-- `rclcpp`
+### ROS2包（通用）
+- `rclcpp` / `rclpy`
 - `geometry_msgs`
 - `sensor_msgs`
 - `tf2_ros`
@@ -369,10 +391,41 @@ publish_tf: true        # 是否发布TF变换
 - `cv_bridge`
 - `visualization_msgs`
 
-### 第三方库
+### 传统方案（C++）
 - OpenCV (>= 4.0)
 - Eigen3
 - yaml-cpp
+
+### YOLO方案（Python）
+
+**注意**: 即使系统已安装C++版本的OpenCV，Python代码仍需要Python版本的OpenCV。
+
+安装依赖：
+```bash
+cd src/station_detector
+
+# 安装Python版OpenCV和其他依赖
+pip3 install -r requirements.txt
+
+# 或者单独安装（如果requirements.txt有问题）
+pip3 install opencv-python>=4.5.0
+pip3 install torch torchvision
+pip3 install ultralytics  # YOLOv8
+pip3 install numpy>=1.21.0
+```
+
+**验证安装**:
+```bash
+python3 -c "import cv2; print(cv2.__version__)"  # 应该显示版本号
+python3 -c "import torch; print(torch.__version__)"  # 应该显示版本号
+```
+
+## 系统要求
+
+- **操作系统**: Ubuntu 20.04/22.04
+- **ROS2**: Foxy/Humble
+- **Python**: 3.8+
+- **OpenCV**: C++版本（系统已安装）+ Python版本（需要安装）
 
 ## 许可证
 

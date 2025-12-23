@@ -1,0 +1,49 @@
+yolo_volleyball_detector:
+  ros__parameters:
+    # ========== YOLO检测参数 ==========
+    yolo:
+      model_path: ""  # 自定义模型路径，为空则使用预训练模型
+      model_type: "yolov8"  # 'yolov5' 或 'yolov8'
+      conf_threshold: 0.5  # 置信度阈值 (0-1)，越高越严格
+      iou_threshold: 0.45  # NMS的IoU阈值 (0-1)
+      device: "auto"  # 'auto', 'cpu', 'cuda'
+      volleyball_classes:  # 排球可能的类别名称（COCO数据集）
+        - "sports ball"
+        - "ball"
+    
+    # ========== 卡尔曼滤波参数 ==========
+    kalman:
+      process_noise: 0.1  # 过程噪声，越大越不信任运动模型
+      measurement_noise: 5.0  # 观测噪声，越大越不信任检测结果
+      initial_uncertainty: 10.0  # 初始状态不确定性
+      max_missing_frames: 5  # 最大允许丢帧数，超过后重置滤波器
+    
+    # ========== 检测验证参数 ==========
+    detection:
+      max_detections: 3  # 最多保留几个检测结果
+      selection_method: "confidence"  # 'confidence'（置信度）或 'center'（中心距离）
+      min_confidence: 0.3  # 最低置信度阈值
+      max_jump_distance: 100.0  # 最大允许跳跃距离(像素)，超过认为是误检
+      min_consistent_detections: 2  # 最小连续检测次数，低于此值认为是误检
+      use_tracker: true  # 是否使用多目标跟踪器
+    
+    # ========== 3D位置估计参数 ==========
+    volleyball:
+      real_radius: 0.105  # 排球真实半径(米)，标准排球直径约21cm
+      min_depth: 0.3  # 最小深度(米)
+      max_depth: 5.0  # 最大深度(米)
+    
+    # ========== 轨迹预测参数 ==========
+    trajectory:
+      prediction_time: 0.5  # 预测时间范围(秒)
+      num_points: 10  # 预测点数
+    
+    # ========== 调试参数 ==========
+    debug:
+      enable: true  # 是否启用调试模式
+      show_fps: true  # 是否显示FPS
+      draw_trajectory: true  # 是否绘制预测轨迹
+    
+    # ========== 其他参数 ==========
+    publish_tf: false  # 是否发布TF变换（暂时不支持）
+

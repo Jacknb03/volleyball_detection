@@ -1,0 +1,28 @@
+# YOLO排球检测系统依赖 (Ubuntu)
+# 注意: 即使系统已安装C++版本的OpenCV，Python代码仍需要Python版本的OpenCV
+
+# 核心依赖
+numpy>=1.21.0
+opencv-python>=4.5.0  # Python版本的OpenCV（与C++版本独立）
+torch>=1.10.0
+torchvision>=0.11.0
+
+# YOLO模型
+# YOLOv8 (推荐，速度快)
+ultralytics>=8.0.0
+
+# YOLOv5 (备选)
+# 如果需要使用YOLOv5，取消下面的注释
+# git+https://github.com/ultralytics/yolov5.git
+
+# ROS2 Python接口（通常已安装）
+# rclpy
+# sensor_msgs
+# geometry_msgs
+# visualization_msgs
+# cv_bridge
+
+# 可选：性能优化
+# onnxruntime  # 如果需要ONNX推理加速
+# onnxruntime-gpu  # GPU加速版本
+

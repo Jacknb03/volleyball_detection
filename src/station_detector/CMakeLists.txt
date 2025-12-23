@@ -59,7 +59,13 @@ install(TARGETS station_pose_estimator
   DESTINATION lib/${PROJECT_NAME})
 
 # 安装脚本（作为可执行，便于 ros2 run）
-install(PROGRAMS scripts/static_image_pub.py
+install(PROGRAMS 
+  scripts/static_image_pub.py
+  scripts/video_publisher.py
+  scripts/yolo_volleyball_node.py
+  scripts/yolo_detector.py
+  scripts/kalman_tracker.py
+  scripts/detection_validator.py
   DESTINATION lib/${PROJECT_NAME})
 
 # 安装资源（launch/config/test_images），换设备也能被 FindPackageShare 找到
