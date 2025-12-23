@@ -1,0 +1,24 @@
+# This file contains the camera calibration parameters for the MindVision camera.
+image_width: 1280
+image_height: 1024
+camera_name: mv_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [1714.3978540609123, 0.0, 635.2911614105518, 0.0, 1717.1272766632876, 493.103083021999, 0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.08877600699660365, 0.407448111469425, -0.0004446230258463023, -0.0018011998597204008, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.000000, 0.000000, 0.000000,
+        0.000000, 1.000000, 0.000000,
+        0.000000, 0.000000, 1.000000]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [1715.23779296875, 0.0, 633.3999630478065, 0.0, 0.0, 1718.8927001953125, 492.62536497084875, 0.0, 0.0, 0.0, 1.0, 0.0]
+  

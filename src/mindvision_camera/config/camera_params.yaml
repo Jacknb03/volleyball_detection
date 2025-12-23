@@ -1,0 +1,7 @@
+/mv_camera:
+  ros__parameters:
+    camera_name: mv_camera
+    exposure_time: 6000  # in microseconds
+    resolution: [1280, 1024]  # width, height
+    frame_rate: 30.0  # in frames per second
+    analog_gain: 32

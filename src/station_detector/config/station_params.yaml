@@ -1,0 +1,41 @@
+station_pose_estimator_node:
+  ros__parameters:
+    use_auto_calibration: true
+    manual_camera_matrix:
+    - 1714.3978540609123
+    - 0.0
+    - 635.2911614105518
+    - 0.0
+    - 1717.1272766632876
+    - 493.103083021999
+    - 0.0
+    - 0.0
+    - 1.0
+    manual_distortion_coeffs:
+    - -0.08877600699660365
+    - 0.407448111469425
+    - -0.0004446230258463023
+    - -0.0018011998597204008
+    - 0.0
+    min_contour_area: 100.0      # 最小轮廓面积(像素²)
+    max_contour_area: 50000.0    # 最大轮廓面积(像素²)
+    publish_tf: true
+    corner_filter_gain: 0.2      # 位置滤波增益(0-1, 越小越平滑)
+    debug: true
+    show_binary_window: true
+    color_detection:  #HSV, Hue色调0-180 Saturation饱和度0-255 Value明度0-255
+      # 白色/浅色检测参数 - 用于排球检测
+      white_lower_h: 0      # 色调下限(白色在HSV中H可以是任意值)
+      white_lower_s: 0      # 饱和度下限(白色饱和度低)
+      white_lower_v: 200    # 明度下限(白色明度高)
+      white_upper_h: 180    # 色调上限
+      white_upper_s: 30     # 饱和度上限(白色饱和度低)
+      white_upper_v: 255    # 明度上限
+      morphology_kernel_size: 5  # 形态学处理卷积核大小
+      use_adaptive_kernel: true   # 是否根据图像大小自适应调整卷积核
+    volleyball:  # 排球检测参数
+      min_radius: 5.0       # 最小半径(像素)
+      max_radius: 200.0     # 最大半径(像素)
+      min_circularity: 0.7  # 最小圆形度(0-1, 1为完美圆形)
+      real_radius: 0.105    # 排球真实半径(米) - 标准排球直径约21cm
+
