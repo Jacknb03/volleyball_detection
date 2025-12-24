@@ -12,6 +12,7 @@ find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -45,6 +46,7 @@ ament_target_dependencies(station_pose_estimator
   rclcpp
   sensor_msgs
   geometry_msgs
+  visualization_msgs
   cv_bridge
   tf2 
   tf2_ros 
