@@ -1,0 +1,41 @@
+ball_detector_node:
+  ros__parameters:
+    yolo:
+      model_path: "src\station_detector_cpp\model\best.onnx"   # 推荐用绝对路径或用 pkg_share 拼
+      model_type: "yolov8"        # 只影响日志
+      conf_threshold: 0.25        # 你建议的 0.25
+      iou_threshold: 0.45
+      device: "auto"              # "cpu"/"cuda"/"auto"
+
+      # 与 Python 一致的“排球类别”过滤（按名字匹配）
+      volleyball_classes:
+        - "sports ball"
+        - "ball"
+
+    kalman:
+      process_noise: 0.1
+      measurement_noise: 5.0
+      initial_uncertainty: 10.0
+      max_missing_frames: 5
+
+    detection:
+      max_jump_distance: 100.0
+      min_consistent_detections: 2
+      max_detections: 3
+      selection_method: "confidence"
+      min_confidence: 0.25         # 与 yolo.conf_threshold 一致
+      use_tracker: true
+
+    trajectory:
+      prediction_time: 0.5
+      num_points: 10
+
+    volleyball:
+      real_radius: 0.105
+      min_depth: 0.3
+      max_depth: 5.0
+
+    debug:
+      enable: true
+      show_fps: true
+      draw_trajectory: true

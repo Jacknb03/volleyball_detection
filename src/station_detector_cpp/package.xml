@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>station_detector_cpp</name>
+  <version>0.1.0</version>
+  <description>Volleyball detection and tracking with YOLO and Kalman filter in C++ (ROS2 Humble).</description>
+
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>Apache License 2.0</license>
+
+  <!-- 构建工具 -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- 构建依赖 -->
+  <build_depend>rclcpp</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>visualization_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>image_transport</build_depend>
+  <build_depend>OpenCV</build_depend>
+  <build_depend>Eigen3</build_depend>
+
+  <!-- 导出给下游的构建依赖（一般与 build_depend 保持一致） -->
+  <build_export_depend>rclcpp</build_export_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>visualization_msgs</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>cv_bridge</build_export_depend>
+  <build_export_depend>image_transport</build_export_depend>
+  <build_export_depend>OpenCV</build_export_depend>
+  <build_export_depend>Eigen3</build_export_depend>
+
+  <!-- 运行时依赖 -->
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>image_transport</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

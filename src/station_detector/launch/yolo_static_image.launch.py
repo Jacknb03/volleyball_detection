@@ -17,7 +17,7 @@ def generate_launch_description():
     
     # 默认图片路径
     default_image = PathJoinSubstitution(
-        [FindPackageShare('station_detector'), 'test_images', 'image1.png']
+        [FindPackageShare('station_detector'), 'test_images', 'image.png']
     )
     default_cam_yaml = PathJoinSubstitution(
         [FindPackageShare('mindvision_camera'), 'config', 'camera_info.yaml']
