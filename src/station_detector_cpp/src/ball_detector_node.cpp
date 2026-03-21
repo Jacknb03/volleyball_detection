@@ -22,8 +22,6 @@
 #include <vector>
 #include <optional>
 #include <algorithm>
-#include <deque>
-#include <numeric>
 
 #include "yolo_inference.hpp"
 #include "ball_tracker.hpp"
@@ -59,6 +57,8 @@ public:
         declare_parameter<std::string>("detection.selection_method", "confidence");
         declare_parameter<double>("detection.min_confidence", 0.3);
         declare_parameter<bool>("detection.use_tracker", true);
+        declare_parameter<double>("detection.h_ema_alpha", 0.3);
+        declare_parameter<double>("detection.max_physical_speed", 25.0);
 
         declare_parameter<double>("trajectory.prediction_time", 0.5);
         declare_parameter<int>("trajectory.num_points", 10);
@@ -251,6 +251,11 @@ private:
             return false;
         }
 
+        // 单类别模型（如 [1,5,8400] -> 1 class）直接信任检测，不做类别名字符串过滤
+        if (yolo_detector_->getNumClasses() == 1) {
+            return true;
+        }
+
         const std::string cls_name = toLower(yolo_detector_->getClassName(class_id));
 
         auto allowed = get_parameter("yolo.volleyball_classes").as_string_array();
@@ -265,6 +270,12 @@ private:
 
     void imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
     {
+        // 每帧开始清空“当帧检测状态”，避免复用上一帧检测
+        bool frame_has_fresh_detection = false;
+        bool ball_found = false;
+        double frame_raw_bbox_height = 0.0;
+        std::string fresh_det_block_reason = "No YOLO box";
+
         cv_bridge::CvImagePtr cv_ptr;
         try {
             cv_ptr = cv_bridge::toCvCopy(msg, "bgr8");
@@ -281,6 +292,7 @@ private:
 
         const auto now_time = this->now();
         double timestamp_sec = now_time.seconds();
+        const double frame_dt = (now_time - last_frame_time_).seconds();
 
         // 1) YOLO 检测
         std::vector<Detection> detections;
@@ -290,49 +302,28 @@ private:
             RCLCPP_ERROR(get_logger(), "YOLO detect failed: %s", e.what());
             detections.clear();
         }
-
-        // 2) 过滤出排球（按 COCO 名称匹配 yolo.volleyball_classes）
-        std::vector<Detection> volleyball_detections;
-        volleyball_detections.reserve(detections.size());
-        for (const auto& d : detections) {
-            if (isVolleyballClass(d.class_id)) {
-                volleyball_detections.push_back(d);
+        {
+            int raw_cnt = 0;
+            for (const auto& d : detections) {
+                if (d.confidence > 0.1f) {
+                    ++raw_cnt;
+                }
             }
+            RCLCPP_INFO(get_logger(), "[YOLO RAW] Detected %d boxes with conf > 0.1", raw_cnt);
         }
 
-        // 3) 过滤低置信度（对齐 Python detection.min_confidence）
-        const float min_confidence =
-            static_cast<float>(get_parameter("detection.min_confidence").as_double());
-        std::vector<Detection> filtered;
-        filtered.reserve(volleyball_detections.size());
-        for (const auto& d : volleyball_detections) {
-            if (d.confidence >= min_confidence) {
-                filtered.push_back(d);
-            }
-        }
+        // 2) EMERGENCY BYPASS: 禁用所有内部过滤链，YOLO 有框即认为找到球
+        std::vector<Detection> volleyball_detections = detections;
+        std::vector<Detection> filtered = detections;
 
-        // 4) 选择最佳检测（对齐 Python: 可选 MultiDetectionTracker，否则按 selection_method 选）
+        // 3) 选择最佳检测（仅按置信度，不做距离/速度/大小等检查）
         bool has_best = false;
         Detection best_det{};
         if (!filtered.empty()) {
-            const std::string method = get_parameter("detection.selection_method").as_string();
-
-            if (multi_tracker_) {
-                // Python tracker.update(filtered) 返回 best detection
-                // 我们用中心点列表回传索引
-                std::vector<cv::Point2f> centers;
-                centers.reserve(filtered.size());
-                for (const auto& d : filtered) {
-                    centers.emplace_back(d.x + d.width * 0.5f, d.y + d.height * 0.5f);
-                }
-                int idx = multi_tracker_->update(centers);
-                if (idx >= 0 && idx < (int)filtered.size()) {
-                    best_det = filtered[idx];
-                    has_best = true;
-                }
-            } else {
-                has_best = yolo_detector_->selectBestDetection(filtered, method, best_det);
-            }
+            has_best = yolo_detector_->selectBestDetection(filtered, "confidence", best_det);
+            ball_found = has_best;
+        } else {
+            fresh_det_block_reason = "No YOLO box after detect()";
         }
 
         // 5) 验证检测 -> 估计相机 3D -> TF 到 world（对齐：YOLO -> Estimator -> TF -> KF）
@@ -340,47 +331,70 @@ private:
         if (has_best) {
             float cx = best_det.x + best_det.width * 0.5f;
             float cy = best_det.y + best_det.height * 0.5f;
-            updateBboxHeightHistory(static_cast<double>(best_det.height));
+            frame_raw_bbox_height = static_cast<double>(best_det.height);
+            frame_has_fresh_detection = true;
+            RCLCPP_INFO(get_logger(), "Raw bbox.height: %.3f", frame_raw_bbox_height);
+            const double h_ema_alpha = get_parameter("detection.h_ema_alpha").as_double();
+            updateBboxHeightEma(static_cast<double>(best_det.height), h_ema_alpha);
 
-            bool ok = detection_filter_->validate(
-                cx, cy,
-                best_det.confidence,
-                frame.cols, frame.rows);
-
-            // 为了快速启动跟踪：首个有效检测不受 min_consistent_detections“热身”限制
-            if (!ok && !ball_tracker_->isInitialized()) {
-                ok = true;
+            if (camera_info_received_ && position_estimator_) {
+                Eigen::Vector3d pos_cam;
+                    if (position_estimator_->estimate(cx, cy, getSmoothedBboxHeight(), pos_cam)) {
+                    // EMERGENCY BYPASS: 禁用深度范围过滤，直接走 TF
+                    std::optional<Eigen::Vector3d> pos_world =
+                        transformCameraToWorld(pos_cam, msg->header, now_time);
+                    if (pos_world.has_value()) {
+                        measurement_world = pos_world.value();
+                    } else {
+                        fresh_det_block_reason = "TF transform failed";
+                    }
+                } else {
+                    fresh_det_block_reason = "position_estimator->estimate failed";
+                }
+            } else {
+                fresh_det_block_reason = "camera_info/position_estimator not ready";
             }
 
-            if (ok) {
-                if (camera_info_received_ && position_estimator_) {
-                    Eigen::Vector3d pos_cam;
-                    if (position_estimator_->estimate(cx, cy, getSmoothedBboxHeight(), pos_cam)) {
-                        const double min_depth = get_parameter("volleyball.min_depth").as_double();
-                        const double max_depth = get_parameter("volleyball.max_depth").as_double();
-                        if (pos_cam.z() >= min_depth && pos_cam.z() <= max_depth) {
-                            // 相机坐标系 -> world 坐标系
-                            std::optional<Eigen::Vector3d> pos_world =
-                                transformCameraToWorld(pos_cam, msg->header, now_time);
-                            if (pos_world.has_value()) {
-                                measurement_world = pos_world.value();
-                            }
-                        }
-                    }
-                }
-
-                if (measurement_world.has_value()) {
-                    last_detection_time_valid_ = true;
-                    last_detection_time_ = now_time;
-                }
+            if (measurement_world.has_value()) {
+                frame_has_fresh_detection = true;
+                last_detection_time_valid_ = true;
+                last_detection_time_ = now_time;
             }
         }
 
-        // 6) 卡尔曼滤波更新（含丢帧预测）
-        ball_tracker_->updateWithMissing(measurement_world, timestamp_sec);
-        bool valid_track = ball_tracker_->isInitialized();
+        // 信任当帧 YOLO：不再因“位置变化过小”丢弃 measurement
 
-        // 7) 发布 world pose + KF 状态，并进行世界系轨迹预测/可视化
+        // 6) Smart Velocity Gating（物理速度门控）
+        if (measurement_world.has_value() && has_last_measurement_world_ && frame_dt > 1e-4) {
+            const Eigen::Vector3d v_temp = (measurement_world.value() - last_measurement_world_) / frame_dt;
+            const double max_speed = get_parameter("detection.max_physical_speed").as_double();
+            if (v_temp.norm() > max_speed) {
+                RCLCPP_WARN(
+                    get_logger(),
+                    "Velocity gate triggered: |v_temp|=%.3f > max_physical_speed=%.3f, use KF predict only",
+                    v_temp.norm(), max_speed);
+                measurement_world = std::nullopt;
+            }
+        }
+
+        // 7) 卡尔曼滤波更新（含丢帧预测）
+        ball_tracker_->updateWithMissing(measurement_world, timestamp_sec);
+        if (measurement_world.has_value()) {
+            last_measurement_world_ = measurement_world.value();
+            has_last_measurement_world_ = true;
+        }
+        if (ball_found && !frame_has_fresh_detection) {
+            RCLCPP_ERROR(
+                get_logger(),
+                "PARADOX: YOLO detected box(es) but fresh_det=false. Reason: %s",
+                fresh_det_block_reason.c_str());
+        }
+        bool valid_track = ball_tracker_->isInitialized();
+        RCLCPP_INFO(get_logger(), "Frame dt: %.4f, KF dt: %.4f, fresh_det: %s",
+                    frame_dt, static_cast<double>(ball_tracker_->getDt()),
+                    frame_has_fresh_detection ? "true" : "false");
+
+        // 8) 发布 world pose + KF 状态，并进行世界系轨迹预测/可视化
         if (valid_track) {
             const Eigen::Vector3d pos_world = ball_tracker_->getPosition();
             const Eigen::Vector3d vel_world = ball_tracker_->getVelocity();
@@ -412,7 +426,7 @@ private:
             publishWorldTrajectory(msg->header, pos_world, vel_world);
         }
 
-        // 8) 生成并发布调试图像（对齐 Python: 用 volleyball_detections + best + kalman_state）
+        // 9) 生成并发布调试图像（对齐 Python: 用 volleyball_detections + best + kalman_state）
         if (get_parameter("debug.enable").as_bool()) {
             publishDebugImage(msg->header, frame, volleyball_detections,
                               has_best ? &best_det : nullptr,
@@ -459,25 +473,28 @@ private:
         return Eigen::Vector3d(p_out.point.x, p_out.point.y, p_out.point.z);
     }
 
-    void updateBboxHeightHistory(double bbox_height)
+    void updateBboxHeightEma(double bbox_height, double alpha)
     {
         if (bbox_height <= 0.0) {
             return;
         }
-        bbox_height_history_.push_back(bbox_height);
-        while (bbox_height_history_.size() > kBboxHeightWindowSize) {
-            bbox_height_history_.pop_front();
+        alpha = std::max(0.0, std::min(1.0, alpha));
+
+        if (!has_bbox_height_ema_) {
+            bbox_height_ema_ = bbox_height;
+            has_bbox_height_ema_ = true;
+            return;
         }
+        // EMA: h_s = alpha * h_raw + (1-alpha) * h_prev
+        bbox_height_ema_ = alpha * bbox_height + (1.0 - alpha) * bbox_height_ema_;
     }
 
     double getSmoothedBboxHeight() const
     {
-        if (bbox_height_history_.empty()) {
+        if (!has_bbox_height_ema_) {
             return 0.0;
         }
-        const double sum = std::accumulate(bbox_height_history_.begin(),
-                                           bbox_height_history_.end(), 0.0);
-        return sum / static_cast<double>(bbox_height_history_.size());
+        return bbox_height_ema_;
     }
 
     void publishBallState(const Eigen::Vector3d& pos,
@@ -584,7 +601,8 @@ private:
                            const Detection* best_det,
                            const rclcpp::Time& now_time)
     {
-        cv::Mat debug = frame.clone();
+        // Atomic fix: always draw on a deep copy that is explicitly published.
+        cv::Mat debug_img = frame.clone();
 
         // 对齐 Python: 绘制所有检测结果（黄色）
         for (const auto& det : detections) {
@@ -592,11 +610,11 @@ private:
             int y1 = (int)det.y;
             int x2 = (int)(det.x + det.width);
             int y2 = (int)(det.y + det.height);
-            cv::rectangle(debug, cv::Point(x1, y1), cv::Point(x2, y2),
+            cv::rectangle(debug_img, cv::Point(x1, y1), cv::Point(x2, y2),
                           cv::Scalar(0, 255, 255), 2);
             int cx = (int)(det.x + det.width * 0.5f);
             int cy = (int)(det.y + det.height * 0.5f);
-            cv::circle(debug, cv::Point(cx, cy), 3, cv::Scalar(0, 255, 255), -1);
+            cv::circle(debug_img, cv::Point(cx, cy), 3, cv::Scalar(0, 255, 255), -1);
 
             // label: class_name: conf
             std::string cls = yolo_detector_
@@ -604,7 +622,7 @@ private:
                                 : "class";
             char buf[128];
             std::snprintf(buf, sizeof(buf), "%s: %.2f", cls.c_str(), (double)det.confidence);
-            cv::putText(debug, buf, cv::Point(x1, y1 - 5),
+            cv::putText(debug_img, buf, cv::Point(x1, y1 - 5),
                         cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 1);
         }
 
@@ -614,16 +632,36 @@ private:
             int y1 = static_cast<int>(best_det->y);
             int x2 = static_cast<int>(best_det->x + best_det->width);
             int y2 = static_cast<int>(best_det->y + best_det->height);
-            cv::rectangle(debug, cv::Point(x1, y1), cv::Point(x2, y2),
+            cv::rectangle(debug_img, cv::Point(x1, y1), cv::Point(x2, y2),
                           cv::Scalar(0, 255, 0), 3);
             int cx = (int)(best_det->x + best_det->width * 0.5f);
             int cy = (int)(best_det->y + best_det->height * 0.5f);
-            cv::circle(debug, cv::Point(cx, cy), 5, cv::Scalar(0, 255, 0), -1);
+            cv::circle(debug_img, cv::Point(cx, cy), 5, cv::Scalar(0, 255, 0), -1);
+
+            // Big Red Circle around detected ball
+            const int radius = std::max(20, static_cast<int>(best_det->height * 0.8f));
+            cv::circle(debug_img, cv::Point(cx, cy), radius, cv::Scalar(0, 0, 255), 4);
         }
+
+        // 无目标时也持续显示搜索状态（UI 始终可见）
+        if (!best_det) {
+            cv::putText(debug_img,
+                        "Searching...",
+                        cv::Point(10, 110),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.7,
+                        cv::Scalar(0, 200, 255), 2);
+        }
+
+        // Bright green system status
+        cv::putText(debug_img,
+                    "SYSTEM ACTIVE",
+                    cv::Point(10, 30),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.9,
+                    cv::Scalar(0, 255, 0), 2);
 
         // 绘制状态信息（对齐 Python）
         int info_y = 20;
-        cv::putText(debug,
+        cv::putText(debug_img,
                     "Detections: " + std::to_string(detections.size()),
                     cv::Point(10, info_y),
                     cv::FONT_HERSHEY_SIMPLEX, 0.6,
@@ -632,13 +670,13 @@ private:
 
         if (ball_tracker_->isInitialized()) {
             std::string msg_text = "KF: OK, Missing: " + std::to_string(ball_tracker_->getMissingFrames());
-            cv::putText(debug,
+            cv::putText(debug_img,
                         msg_text,
                         cv::Point(10, info_y),
                         cv::FONT_HERSHEY_SIMPLEX, 0.6,
                         cv::Scalar(0, 255, 0), 2);
         } else {
-            cv::putText(debug,
+            cv::putText(debug_img,
                         "KF: Not initialized",
                         cv::Point(10, info_y),
                         cv::FONT_HERSHEY_SIMPLEX, 0.6,
@@ -653,7 +691,7 @@ private:
         }
         char zbuf[96];
         std::snprintf(zbuf, sizeof(zbuf), "Current Z Depth: %.3f m", current_z);
-        cv::putText(debug,
+        cv::putText(debug_img,
                     zbuf,
                     cv::Point(10, info_y),
                     cv::FONT_HERSHEY_SIMPLEX, 0.6,
@@ -670,18 +708,15 @@ private:
         }
         char buf[64];
         std::snprintf(buf, sizeof(buf), "FPS: %.1f", fps);
-        cv::putText(debug,
+        cv::putText(debug_img,
                     buf,
                     cv::Point(10, info_y),
                     cv::FONT_HERSHEY_SIMPLEX, 0.6,
                     cv::Scalar(255, 255, 255), 2);
 
-        cv_bridge::CvImage out_msg;
-        out_msg.header = header;
-        out_msg.encoding = "bgr8";
-        out_msg.image = debug;
-
-        debug_pub_->publish(*out_msg.toImageMsg());
+        // FORCE PUBLISH using the exact drawn Mat
+        auto out_msg = cv_bridge::CvImage(header, "bgr8", debug_img).toImageMsg();
+        debug_pub_->publish(*out_msg);
     }
 
 private:
@@ -712,8 +747,10 @@ private:
     bool camera_info_received_{false};
     cv::Mat camera_matrix_;
     cv::Mat distortion_coeffs_;
-    static constexpr size_t kBboxHeightWindowSize = 3;
-    std::deque<double> bbox_height_history_;
+    double bbox_height_ema_{0.0};
+    bool has_bbox_height_ema_{false};
+    Eigen::Vector3d last_measurement_world_{0.0, 0.0, 0.0};
+    bool has_last_measurement_world_{false};
 };
 
 int main(int argc, char** argv)

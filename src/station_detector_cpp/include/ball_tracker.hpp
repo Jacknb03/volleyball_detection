@@ -55,6 +55,8 @@ public:
 
     /// 当前丢帧数（等价 missing_frames）
     int getMissingFrames() const { return missing_frames_; }
+    /// 最近一次内部使用的 dt（秒）
+    float getDt() const { return dt_; }
 
     /// 最大丢帧数（等价 max_missing_frames）
     int getMaxMissingFrames() const { return max_missing_frames_; }
