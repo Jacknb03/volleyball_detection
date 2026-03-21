@@ -86,4 +86,9 @@ private:
     int    missing_frames_;     // 丢帧计数
     int    max_missing_frames_; // 最大丢帧数
     double last_update_time_;   // 上次更新时间（秒）
+
+    // 用于“第二帧”速度启动：v0 = (p1 - p0)/dt
+    Eigen::Vector3f last_measurement_{0.0f, 0.0f, 0.0f};
+    bool has_last_measurement_{false};
+    bool velocity_bootstrapped_{false};
 };

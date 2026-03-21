@@ -54,7 +54,7 @@ public:
         declare_parameter<int>("kalman.max_missing_frames", 5);
 
         declare_parameter<double>("detection.max_jump_distance", 100.0);
-        declare_parameter<int>("detection.min_consistent_detections", 2);
+        declare_parameter<int>("detection.min_consistent_detections", 1);
         declare_parameter<int>("detection.max_detections", 3);
         declare_parameter<std::string>("detection.selection_method", "confidence");
         declare_parameter<double>("detection.min_confidence", 0.3);
@@ -90,6 +90,14 @@ public:
         initTracking();
         world_frame_id_ = get_parameter("world_frame_id").as_string();
         camera_frame_id_ = get_parameter("camera_frame_id").as_string();
+        if (world_frame_id_ == camera_frame_id_) {
+            RCLCPP_WARN(
+                get_logger(),
+                "CRITICAL FRAME WARNING: world_frame_id == camera_frame_id (%s). "
+                "Gravity is applied on World Z(height), but camera optical Z is depth. "
+                "Trajectory may drop vertically unless TF maps camera->world correctly.",
+                world_frame_id_.c_str());
+        }
 
         // TF2: 相机坐标系 -> 世界坐标系
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -339,6 +347,11 @@ private:
                 best_det.confidence,
                 frame.cols, frame.rows);
 
+            // 为了快速启动跟踪：首个有效检测不受 min_consistent_detections“热身”限制
+            if (!ok && !ball_tracker_->isInitialized()) {
+                ok = true;
+            }
+
             if (ok) {
                 if (camera_info_received_ && position_estimator_) {
                     Eigen::Vector3d pos_cam;
@@ -375,6 +388,10 @@ private:
                 get_logger(), *this->get_clock(), 500,
                 "Tracking Ball at [%.3f, %.3f, %.3f]",
                 pos_world.x(), pos_world.y(), pos_world.z());
+            RCLCPP_INFO(
+                get_logger(),
+                "Velocity: Vx=%.2f, Vy=%.2f, Vz=%.2f",
+                vel_world.x(), vel_world.y(), vel_world.z());
 
             // /volleyball_pose（world frame）
             geometry_msgs::msg::PoseStamped pose;
@@ -629,23 +646,35 @@ private:
         }
         info_y += 25;
 
-        if (get_parameter("debug.show_fps").as_bool()) {
-            // 对齐 Python: fps 使用 last_detection_time（仅在有有效检测时更新）
-            double fps = 0.0;
-            if (last_detection_time_valid_) {
-                double dt = (now_time - last_detection_time_).seconds();
-                if (dt > 1e-6) {
-                    fps = 1.0 / dt;
-                }
-            }
-            char buf[64];
-            std::snprintf(buf, sizeof(buf), "FPS: %.1f", fps);
-            cv::putText(debug,
-                        buf,
-                        cv::Point(10, info_y),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6,
-                        cv::Scalar(255, 255, 255), 2);
+        // Current Z Depth / Height in world frame (from KF state z)
+        double current_z = 0.0;
+        if (ball_tracker_->isInitialized()) {
+            current_z = ball_tracker_->getPosition().z();
         }
+        char zbuf[96];
+        std::snprintf(zbuf, sizeof(zbuf), "Current Z Depth: %.3f m", current_z);
+        cv::putText(debug,
+                    zbuf,
+                    cv::Point(10, info_y),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                    cv::Scalar(255, 255, 255), 2);
+        info_y += 25;
+
+        // 始终显示 FPS，避免无检测时 UI 消失
+        double fps = 0.0;
+        if (last_detection_time_valid_) {
+            double dt = (now_time - last_detection_time_).seconds();
+            if (dt > 1e-6) {
+                fps = 1.0 / dt;
+            }
+        }
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "FPS: %.1f", fps);
+        cv::putText(debug,
+                    buf,
+                    cv::Point(10, info_y),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                    cv::Scalar(255, 255, 255), 2);
 
         cv_bridge::CvImage out_msg;
         out_msg.header = header;
@@ -683,7 +712,7 @@ private:
     bool camera_info_received_{false};
     cv::Mat camera_matrix_;
     cv::Mat distortion_coeffs_;
-    static constexpr size_t kBboxHeightWindowSize = 5;
+    static constexpr size_t kBboxHeightWindowSize = 3;
     std::deque<double> bbox_height_history_;
 };
 

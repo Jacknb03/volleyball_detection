@@ -19,7 +19,7 @@ ball_detector_node:
 
     detection:
       max_jump_distance: 100.0
-      min_consistent_detections: 2
+      min_consistent_detections: 1
       max_detections: 3
       selection_method: "confidence"
       min_confidence: 0.25

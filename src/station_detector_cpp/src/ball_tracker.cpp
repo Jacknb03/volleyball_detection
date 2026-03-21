@@ -57,6 +57,12 @@ void BallTracker::initialize(const Eigen::Vector3d& measurement, double timestam
     is_initialized_ = true;
     missing_frames_ = 0;
     last_update_time_ = timestamp;
+    last_measurement_ = Eigen::Vector3f(
+        static_cast<float>(measurement.x()),
+        static_cast<float>(measurement.y()),
+        static_cast<float>(measurement.z()));
+    has_last_measurement_ = true;
+    velocity_bootstrapped_ = false;
 }
 
 Eigen::Vector3d BallTracker::predict(double timestamp)
@@ -101,6 +107,19 @@ void BallTracker::update(const Eigen::Vector3d& measurement, double timestamp)
         dt_ = std::max(0.001f, dt);
     }
 
+    // 第二次检测时用有限差分“注入”初速度，避免轨迹预测从零速起步
+    if (!velocity_bootstrapped_ && has_last_measurement_ && dt_ > 1e-4f) {
+        const Eigen::Vector3f meas(
+            static_cast<float>(measurement.x()),
+            static_cast<float>(measurement.y()),
+            static_cast<float>(measurement.z()));
+        const Eigen::Vector3f v0 = (meas - last_measurement_) / dt_;
+        state_(3) = v0.x();
+        state_(4) = v0.y();
+        state_(5) = v0.z();
+        velocity_bootstrapped_ = true;
+    }
+
     // predict 到当前 timestamp
     predict(timestamp);
 
@@ -131,6 +150,11 @@ void BallTracker::update(const Eigen::Vector3d& measurement, double timestamp)
 
     missing_frames_   = 0;
     last_update_time_ = timestamp;
+    last_measurement_ = Eigen::Vector3f(
+        static_cast<float>(measurement.x()),
+        static_cast<float>(measurement.y()),
+        static_cast<float>(measurement.z()));
+    has_last_measurement_ = true;
 }
 
 Eigen::Vector3d BallTracker::updateWithMissing(const std::optional<Eigen::Vector3d>& measurement,
@@ -146,6 +170,8 @@ Eigen::Vector3d BallTracker::updateWithMissing(const std::optional<Eigen::Vector
             P_ *= 10.0f;
             missing_frames_ = 0;
             last_update_time_ = 0.0;
+            has_last_measurement_ = false;
+            velocity_bootstrapped_ = false;
             return Eigen::Vector3d::Zero();
         }
 
@@ -176,4 +202,6 @@ void BallTracker::reset()
     P_ *= 10.0f;
     missing_frames_ = 0;
     last_update_time_ = 0.0;
+    has_last_measurement_ = false;
+    velocity_bootstrapped_ = false;
 }
