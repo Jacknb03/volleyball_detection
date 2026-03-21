@@ -1,0 +1,4 @@
+Invoking command in '/home/song/volleyball_detection/build/mindvision_camera': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/mindvision_camera -- -j20 -l20
+Invoked command in '/home/song/volleyball_detection/build/mindvision_camera' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/mindvision_camera -- -j20 -l20
+Invoking command in '/home/song/volleyball_detection/build/mindvision_camera': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/mindvision_camera
+Invoked command in '/home/song/volleyball_detection/build/mindvision_camera' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/mindvision_camera

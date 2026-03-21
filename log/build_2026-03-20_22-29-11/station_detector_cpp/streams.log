@@ -1,0 +1,143 @@
+[0.016s] Invoking command in '/home/song/volleyball_detection/build/station_detector_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/song/volleyball_detection/src/station_detector_cpp -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/song/volleyball_detection/install/station_detector_cpp
+[0.138s] -- The C compiler identification is GNU 11.4.0
+[0.279s] -- The CXX compiler identification is GNU 11.4.0
+[0.298s] -- Detecting C compiler ABI info
+[0.418s] -- Detecting C compiler ABI info - done
+[0.432s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.432s] -- Detecting C compile features
+[0.433s] -- Detecting C compile features - done
+[0.440s] -- Detecting CXX compiler ABI info
+[0.576s] -- Detecting CXX compiler ABI info - done
+[0.589s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.589s] -- Detecting CXX compile features
+[0.590s] -- Detecting CXX compile features - done
+[0.605s] -- Found ament_cmake: 1.3.13 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.878s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.987s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[1.027s] -- Found rclcpp: 16.0.18 (/opt/ros/humble/share/rclcpp/cmake)
+[1.104s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[1.112s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[1.126s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[1.148s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.177s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.254s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[1.258s] -- Found rmw_fastrtps_cpp: 6.2.10 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[1.377s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.2")  
+[1.427s] -- Found FastRTPS: /opt/ros/humble/include  
+[1.493s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.508s] -- Looking for pthread.h
+[1.634s] -- Looking for pthread.h - found
+[1.635s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[1.762s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[1.765s] -- Found Threads: TRUE  
+[1.858s] -- Found sensor_msgs: 4.9.1 (/opt/ros/humble/share/sensor_msgs/cmake)
+[1.892s] -- Found visualization_msgs: 4.9.1 (/opt/ros/humble/share/visualization_msgs/cmake)
+[1.926s] -- Found cv_bridge: 3.2.1 (/home/song/cv_bridge_ws/install/cv_bridge/share/cv_bridge/cmake)
+[1.941s] -- Found image_transport: 3.1.12 (/opt/ros/humble/share/image_transport/cmake)
+[1.995s] -- Found OpenCV: /usr/local (found version "4.11.0") 
+[2.004s] -- Found tf2: 0.25.19 (/opt/ros/humble/share/tf2/cmake)
+[2.008s] -- Found tf2_ros: 0.25.19 (/opt/ros/humble/share/tf2_ros/cmake)
+[2.057s] -- Found tf2_geometry_msgs: 0.25.19 (/opt/ros/humble/share/tf2_geometry_msgs/cmake)
+[2.061s] -- Found eigen3_cmake_module: 0.1.1 (/opt/ros/humble/share/eigen3_cmake_module/cmake)
+[2.062s] -- Found Eigen3: TRUE (found version "3.4.0") 
+[2.062s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[2.102s] -- Configuring done
+[2.112s] -- Generating done
+[2.115s] -- Build files have been written to: /home/song/volleyball_detection/build/station_detector_cpp
+[2.122s] Invoked command in '/home/song/volleyball_detection/build/station_detector_cpp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/song/volleyball_detection/src/station_detector_cpp -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/song/volleyball_detection/install/station_detector_cpp
+[2.123s] Invoking command in '/home/song/volleyball_detection/build/station_detector_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/station_detector_cpp -- -j20 -l20
+[2.163s] [ 42%] Building CXX object CMakeFiles/ball_detector_node.dir/src/detection_filter.cpp.o
+[2.163s] [ 42%] Building CXX object CMakeFiles/ball_detector_node.dir/src/ball_detector_node.cpp.o
+[2.163s] [ 42%] Building CXX object CMakeFiles/ball_detector_node.dir/src/ball_tracker.cpp.o
+[2.165s] [ 57%] Building CXX object CMakeFiles/ball_detector_node.dir/src/yolo_inference.cpp.o
+[2.165s] [ 71%] Building CXX object CMakeFiles/ball_detector_node.dir/src/ball_position_estimator.cpp.o
+[2.165s] [ 85%] Building CXX object CMakeFiles/ball_detector_node.dir/src/trajectory_predictor.cpp.o
+[2.504s] In file included from /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:15:
+[2.504s] /opt/ros/humble/include/tf2_geometry_msgs/tf2_geometry_msgs/tf2_geometry_msgs.h:35:2: warning: #warning This header is obsolete, please include tf2_geometry_msgs/tf2_geometry_msgs.hpp instead [-Wcpp]
+[2.504s]    35 | #warning This header is obsolete, please include tf2_geometry_msgs/tf2_geometry_msgs.hpp instead
+[2.504s]       |  ^~~~~~~
+[3.017s] /home/song/volleyball_detection/src/station_detector_cpp/src/yolo_inference.cpp:253:6: error: redefinition of ‘void YOLODetector::runModel(const cv::Mat&, std::vector<Detection>&) const’
+[3.017s]   253 | void YOLODetector::runModel(const cv::Mat& image,
+[3.017s]       |      ^~~~~~~~~~~~
+[3.018s] /home/song/volleyball_detection/src/station_detector_cpp/src/yolo_inference.cpp:232:6: note: ‘virtual void YOLODetector::runModel(const cv::Mat&, std::vector<Detection>&) const’ previously defined here
+[3.018s]   232 | void YOLODetector::runModel(const cv::Mat& /*image*/,
+[3.018s]       |      ^~~~~~~~~~~~
+[3.276s] gmake[2]: *** [CMakeFiles/ball_detector_node.dir/build.make:90: CMakeFiles/ball_detector_node.dir/src/yolo_inference.cpp.o] Error 1
+[3.276s] gmake[2]: *** Waiting for unfinished jobs....
+[5.347s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:648:30: error: ‘Buffer’ is not a member of ‘tf2_ros’; did you mean ‘cv::ogl::Buffer’?
+[5.347s]   648 |     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+[5.347s]       |                              ^~~~~~
+[5.347s] In file included from /usr/local/include/opencv4/opencv2/core.hpp:53,
+[5.347s]                  from /usr/local/include/opencv4/opencv2/core/core.hpp:48,
+[5.347s]                  from /home/song/cv_bridge_ws/install/cv_bridge/include/cv_bridge/cv_bridge/cv_bridge.h:43,
+[5.347s]                  from /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:11:
+[5.347s] /usr/local/include/opencv4/opencv2/core/base.hpp:629:22: note: ‘cv::ogl::Buffer’ declared here
+[5.347s]   629 |     class CV_EXPORTS Buffer;
+[5.347s]       |                      ^~~~~~
+[5.347s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:648:36: error: template argument 1 is invalid
+[5.347s]   648 |     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+[5.347s]       |                                    ^
+[5.347s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:648:36: error: template argument 2 is invalid
+[5.415s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp: In constructor ‘BallDetectorNode::BallDetectorNode()’:
+[5.416s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:92:48: error: ‘Buffer’ is not a member of ‘tf2_ros’; did you mean ‘cv::ogl::Buffer’?
+[5.416s]    92 |         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+[5.416s]       |                                                ^~~~~~
+[5.416s] In file included from /usr/local/include/opencv4/opencv2/core.hpp:53,
+[5.416s]                  from /usr/local/include/opencv4/opencv2/core/core.hpp:48,
+[5.416s]                  from /home/song/cv_bridge_ws/install/cv_bridge/include/cv_bridge/cv_bridge/cv_bridge.h:43,
+[5.416s]                  from /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:11:
+[5.416s] /usr/local/include/opencv4/opencv2/core/base.hpp:629:22: note: ‘cv::ogl::Buffer’ declared here
+[5.416s]   629 |     class CV_EXPORTS Buffer;
+[5.416s]       |                      ^~~~~~
+[5.416s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:92:55: error: no matching function for call to ‘make_unique<<expression error> >(rclcpp::Clock::SharedPtr)’
+[5.416s]    92 |         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+[5.416s]       |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~
+[5.416s] In file included from /usr/include/c++/11/memory:76,
+[5.416s]                  from /opt/ros/humble/include/rclcpp/rclcpp/rclcpp.hpp:153,
+[5.416s]                  from /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:1:
+[5.416s] /usr/include/c++/11/bits/unique_ptr.h:961:5: note: candidate: ‘template<class _Tp, class ... _Args> typename std::_MakeUniq<_Tp>::__single_object std::make_unique(_Args&& ...)’
+[5.417s]   961 |     make_unique(_Args&&... __args)
+[5.417s]       |     ^~~~~~~~~~~
+[5.417s] /usr/include/c++/11/bits/unique_ptr.h:961:5: note:   template argument deduction/substitution failed:
+[5.417s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:92:55: error: template argument 1 is invalid
+[5.417s]    92 |         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+[5.417s]       |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~
+[5.417s] In file included from /usr/include/c++/11/memory:76,
+[5.417s]                  from /opt/ros/humble/include/rclcpp/rclcpp/rclcpp.hpp:153,
+[5.417s]                  from /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:1:
+[5.417s] /usr/include/c++/11/bits/unique_ptr.h:967:5: note: candidate: ‘template<class _Tp> typename std::_MakeUniq<_Tp>::__array std::make_unique(std::size_t)’
+[5.417s]   967 |     make_unique(size_t __num)
+[5.417s]       |     ^~~~~~~~~~~
+[5.417s] /usr/include/c++/11/bits/unique_ptr.h:967:5: note:   template argument deduction/substitution failed:
+[5.417s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:92:55: error: template argument 1 is invalid
+[5.417s]    92 |         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+[5.417s]       |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~
+[5.417s] In file included from /usr/include/c++/11/memory:76,
+[5.417s]                  from /opt/ros/humble/include/rclcpp/rclcpp/rclcpp.hpp:153,
+[5.417s]                  from /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:1:
+[5.417s] /usr/include/c++/11/bits/unique_ptr.h:973:5: note: candidate: ‘template<class _Tp, class ... _Args> typename std::_MakeUniq<_Tp>::__invalid_type std::make_unique(_Args&& ...)’ (deleted)
+[5.418s]   973 |     make_unique(_Args&&...) = delete;
+[5.418s]       |     ^~~~~~~~~~~
+[5.418s] /usr/include/c++/11/bits/unique_ptr.h:973:5: note:   template argument deduction/substitution failed:
+[5.418s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:92:55: error: template argument 1 is invalid
+[5.418s]    92 |         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+[5.418s]       |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~
+[5.418s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:93:69: error: invalid type argument of unary ‘*’ (have ‘int’)
+[5.418s]    93 |         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+[5.418s]       |                                                                     ^~~~~~~~~~~
+[5.475s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp: In static member function ‘static const std::vector<std::__cxx11::basic_string<char> >& BallDetectorNode::coco80Names()’:
+[5.476s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:238:80: error: ‘static std::vector<std::__cxx11::basic_string<char> > YOLODetector::coco80Names()’ is protected within this context
+[5.476s]   238 |         static const std::vector<std::string> names = YOLODetector::coco80Names();
+[5.476s]       |                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+[5.476s] In file included from /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:25:
+[5.476s] /home/song/volleyball_detection/src/station_detector_cpp/include/yolo_inference.hpp:141:37: note: declared protected here
+[5.476s]   141 |     static std::vector<std::string> coco80Names();
+[5.476s]       |                                     ^~~~~~~~~~~
+[5.492s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp: In member function ‘std::optional<Eigen::Matrix<double, 3, 1> > BallDetectorNode::transformCameraToWorld(const Vector3d&, const Header&, const rclcpp::Time&) const’:
+[5.492s] /home/song/volleyball_detection/src/station_detector_cpp/src/ball_detector_node.cpp:436:31: error: base operand of ‘->’ is not a pointer
+[5.492s]   436 |             p_out = tf_buffer_->transform(p_in, world_frame_id_, timeout);
+[5.492s]       |                               ^~
+[7.873s] gmake[2]: *** [CMakeFiles/ball_detector_node.dir/build.make:76: CMakeFiles/ball_detector_node.dir/src/ball_detector_node.cpp.o] Error 1
+[7.873s] gmake[1]: *** [CMakeFiles/Makefile2:137: CMakeFiles/ball_detector_node.dir/all] Error 2
+[7.873s] gmake: *** [Makefile:146: all] Error 2
+[7.874s] Invoked command in '/home/song/volleyball_detection/build/station_detector_cpp' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/station_detector_cpp -- -j20 -l20

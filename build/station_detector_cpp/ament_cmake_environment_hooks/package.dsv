@@ -1,0 +1,4 @@
+source;share/station_detector_cpp/local_setup.bash
+source;share/station_detector_cpp/local_setup.dsv
+source;share/station_detector_cpp/local_setup.sh
+source;share/station_detector_cpp/local_setup.zsh

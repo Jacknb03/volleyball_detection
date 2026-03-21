@@ -107,6 +107,8 @@ public:
     float getIouThreshold() const  { return iou_threshold_; }
     const std::string& getModelType() const { return model_type_; }
     const std::string& getDevice() const     { return device_; }
+    int getNumClasses() const { return num_classes_; }
+    std::string getClassName(int class_id) const;
 
 protected:
     /**
@@ -138,5 +140,6 @@ protected:
     mutable std::vector<std::string> class_names_;
 
     void ensureNetInitialized() const;
+public:
     static std::vector<std::string> coco80Names();
 };

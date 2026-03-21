@@ -1,0 +1,58 @@
+[0.015s] Invoking command in '/home/song/volleyball_detection/build/station_detector': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/song/volleyball_detection/src/station_detector -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/song/volleyball_detection/install/station_detector
+[0.150s] -- The C compiler identification is GNU 11.4.0
+[0.285s] -- The CXX compiler identification is GNU 11.4.0
+[0.302s] -- Detecting C compiler ABI info
+[0.429s] -- Detecting C compiler ABI info - done
+[0.442s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.442s] -- Detecting C compile features
+[0.443s] -- Detecting C compile features - done
+[0.448s] -- Detecting CXX compiler ABI info
+[0.582s] -- Detecting CXX compiler ABI info - done
+[0.595s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.595s] -- Detecting CXX compile features
+[0.596s] -- Detecting CXX compile features - done
+[0.609s] -- Found ament_cmake: 1.3.13 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.882s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.991s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[1.031s] -- Found ament_index_cpp: 1.4.1 (/opt/ros/humble/share/ament_index_cpp/cmake)
+[1.034s] -- Found rclcpp: 16.0.18 (/opt/ros/humble/share/rclcpp/cmake)
+[1.108s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[1.116s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[1.131s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[1.154s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.184s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.258s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[1.263s] -- Found rmw_fastrtps_cpp: 6.2.10 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[1.380s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.2")  
+[1.429s] -- Found FastRTPS: /opt/ros/humble/include  
+[1.502s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.515s] -- Looking for pthread.h
+[1.635s] -- Looking for pthread.h - found
+[1.636s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[1.758s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[1.760s] -- Found Threads: TRUE  
+[1.862s] -- Found sensor_msgs: 4.9.1 (/opt/ros/humble/share/sensor_msgs/cmake)
+[1.896s] -- Found visualization_msgs: 4.9.1 (/opt/ros/humble/share/visualization_msgs/cmake)
+[1.930s] -- Found cv_bridge: 3.2.1 (/home/song/cv_bridge_ws/install/cv_bridge/share/cv_bridge/cmake)
+[1.951s] -- Found tf2: 0.25.19 (/opt/ros/humble/share/tf2/cmake)
+[1.972s] -- Found tf2_ros: 0.25.19 (/opt/ros/humble/share/tf2_ros/cmake)
+[2.058s] -- Found tf2_geometry_msgs: 0.25.19 (/opt/ros/humble/share/tf2_geometry_msgs/cmake)
+[2.066s] -- Found eigen3_cmake_module: 0.1.1 (/opt/ros/humble/share/eigen3_cmake_module/cmake)
+[2.067s] -- Found Eigen3: TRUE (found version "3.4.0") 
+[2.067s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[2.068s] -- Found image_transport: 3.1.12 (/opt/ros/humble/share/image_transport/cmake)
+[2.079s] -- Found camera_info_manager: 3.1.12 (/opt/ros/humble/share/camera_info_manager/cmake)
+[2.086s] -- Found OpenCV: /usr/local (found version "4.11.0") found components: core imgproc calib3d highgui imgcodecs 
+[2.125s] -- Configuring done
+[2.134s] -- Generating done
+[2.137s] -- Build files have been written to: /home/song/volleyball_detection/build/station_detector
+[2.144s] Invoked command in '/home/song/volleyball_detection/build/station_detector' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/song/volleyball_detection/src/station_detector -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/song/volleyball_detection/install/station_detector
+[2.144s] Invoking command in '/home/song/volleyball_detection/build/station_detector': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/station_detector -- -j20 -l20
+[2.180s] [ 14%] Building CXX object CMakeFiles/station_pose_estimator.dir/src/fusion_station_detector.cpp.o
+[2.181s] [ 28%] Building CXX object CMakeFiles/station_pose_estimator.dir/src/kalman_filter.cpp.o
+[2.181s] [ 42%] Building CXX object CMakeFiles/station_pose_estimator.dir/src/main.cpp.o
+[2.182s] [ 57%] Building CXX object CMakeFiles/station_pose_estimator.dir/src/station_pose_estimator.cpp.o
+[2.182s] [ 71%] Building CXX object CMakeFiles/station_pose_estimator.dir/src/debug_manager.cpp.o
+[2.182s] [ 85%] Building CXX object CMakeFiles/station_pose_estimator.dir/src/station_params.cpp.o
+[13.400s] [100%] Linking CXX executable station_pose_estimator
+[14.467s] [100%] Built target station_pose_estimator

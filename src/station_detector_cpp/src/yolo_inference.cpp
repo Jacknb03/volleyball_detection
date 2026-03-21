@@ -38,6 +38,17 @@ std::vector<std::string> YOLODetector::coco80Names()
     };
 }
 
+std::string YOLODetector::getClassName(int class_id) const
+{
+    if (class_id < 0) {
+        return "class";
+    }
+    if (class_id < static_cast<int>(class_names_.size())) {
+        return class_names_[class_id];
+    }
+    return "class_" + std::to_string(class_id);
+}
+
 void YOLODetector::ensureNetInitialized() const
 {
     if (net_initialized_) {
@@ -229,17 +240,6 @@ void YOLODetector::updateThresholds(float conf_threshold, float iou_threshold)
     // 这里不直接操作模型实例，由具体 runModel 实现去使用这两个成员变量。
 }
 
-void YOLODetector::runModel(const cv::Mat& /*image*/,
-                            std::vector<Detection>& /*detections*/) const
-{
-    // Concrete inference implementation using OpenCV DNN + ONNX.
-    // This keeps the same high-level behavior as Python:
-    // - run model
-    // - produce bbox + confidence + class_id for each detection
-    // - NMS with iou_threshold
-    // - filter by conf_threshold (objectness*class_prob style)
-}
-
 static inline float sigmoidf(float x)
 {
     return 1.0f / (1.0f + std::exp(-x));
@@ -277,108 +277,154 @@ void YOLODetector::runModel(const cv::Mat& image,
     }
 
     // Merge outputs if multiple heads exist (some exports return one tensor, some several).
-    // We will parse each output tensor and append candidates.
+    // We parse both [1,C,N] and [1,N,C], where C is expected to be (4 + num_classes).
     std::vector<cv::Rect> boxes;
     std::vector<float> scores;
     std::vector<int> class_ids;
 
-    auto parse_one = [&](cv::Mat out) {
-        // Ensure shape is 2D: [N, C] where C = 5 + num_classes
-        // Possible layouts:
-        // - [1, N, C]
-        // - [1, C, N]  (need transpose)
-        // - [N, C]
-
-        if (out.dims == 3) {
-            const int d0 = out.size[0];
-            const int d1 = out.size[1];
-            const int d2 = out.size[2];
-
-            // If [1, N, C]
-            if (d0 == 1) {
-                // reshape to [N, C] or [C, N] depending on which is larger like class dim
-                cv::Mat m = out.reshape(1, d1); // [d1, d2]
-                if (m.cols < 6 && d2 >= 6) {
-                    // fallback (shouldn't happen)
-                    m = out.reshape(1, d2);
-                }
-                out = m;
+    auto updateClassMetadata = [this](int cls_count) {
+        if (cls_count <= 0) {
+            return;
+        }
+        num_classes_ = cls_count;
+        if (cls_count == 1) {
+            class_names_ = {"volleyball"};
+            return;
+        }
+        const auto coco = coco80Names();
+        class_names_.clear();
+        class_names_.reserve(cls_count);
+        for (int i = 0; i < cls_count; ++i) {
+            if (i < static_cast<int>(coco.size())) {
+                class_names_.push_back(coco[i]);
+            } else {
+                class_names_.push_back("class_" + std::to_string(i));
             }
         }
+    };
 
-        if (out.dims == 2) {
-            // ok
-        } else if (out.dims == 3) {
-            // still 3D with non-1 batch; not expected
+    auto pushCandidate = [&](float cx, float cy, float w, float h, int best_cls, float conf) {
+        if (conf < conf_threshold_) {
             return;
-        } else if (out.total() > 0) {
-            // flatten
-            out = out.reshape(1, static_cast<int>(out.total()));
-            return;
-        } else {
+        }
+        float left = (cx - 0.5f * w) * x_factor;
+        float top  = (cy - 0.5f * h) * y_factor;
+        float width = w * x_factor;
+        float height = h * y_factor;
+
+        left = clampf(left, 0.0f, static_cast<float>(image.cols - 1));
+        top  = clampf(top,  0.0f, static_cast<float>(image.rows - 1));
+        width  = clampf(width,  0.0f, static_cast<float>(image.cols) - left);
+        height = clampf(height, 0.0f, static_cast<float>(image.rows) - top);
+        if (width <= 1.0f || height <= 1.0f) {
             return;
         }
 
-        // If transposed [C, N], convert to [N, C] by transpose when C is small.
-        if (out.rows < out.cols && out.rows <= 100 && out.cols > 100) {
-            // heuristic: rows might be C
-            cv::Mat t;
-            cv::transpose(out, t);
-            out = t;
-        }
+        boxes.emplace_back(cv::Rect(static_cast<int>(left),
+                                    static_cast<int>(top),
+                                    static_cast<int>(width),
+                                    static_cast<int>(height)));
+        scores.push_back(conf);
+        class_ids.push_back(best_cls);
+    };
 
-        const int C = out.cols;
-        if (C < 6) {
+    auto parseNcRows = [&](const cv::Mat& row_major) {
+        // row_major: [N, C], C should be 4 + num_classes
+        if (row_major.empty() || row_major.rows <= 0 || row_major.cols < 5) {
             return;
         }
+        const int C = row_major.cols;
+        const int cls_count = C - 4;
+        if (cls_count <= 0) {
+            return;
+        }
+        updateClassMetadata(cls_count);
 
-        // We assume YOLO output row format: [cx, cy, w, h, obj, cls...]
-        const int cls_count = C - 5;
+        for (int i = 0; i < row_major.rows; ++i) {
+            const float* data = row_major.ptr<float>(i);
+            if (!data) {
+                continue;
+            }
+            const float cx = data[0];
+            const float cy = data[1];
+            const float w  = data[2];
+            const float h  = data[3];
 
-        for (int i = 0; i < out.rows; ++i) {
-            const float* data = out.ptr<float>(i);
-            float cx = data[0];
-            float cy = data[1];
-            float w  = data[2];
-            float h  = data[3];
-            float obj = data[4];
-
-            // Some exports already apply sigmoid; keep as-is (no redesign).
-            // If values look unbounded, sigmoid could be needed; we keep raw multiply behavior
-            // consistent with typical YOLO parsing.
-
+            // Custom YOLOv8 [1, 5, 8400]: class score at index 4.
             int best_cls = 0;
-            float best_prob = data[5];
+            float best_prob = data[4];
             for (int c = 1; c < cls_count; ++c) {
-                float p = data[5 + c];
+                const float p = data[4 + c];
                 if (p > best_prob) {
                     best_prob = p;
                     best_cls = c;
                 }
             }
+            const float conf = best_prob;
+            pushCandidate(cx, cy, w, h, best_cls, conf);
+        }
+    };
 
-            float conf = obj * best_prob;
-            if (conf < conf_threshold_) {
-                continue;
+    auto parse_one = [&](const cv::Mat& out) {
+        if (out.empty()) {
+            return;
+        }
+        if (out.dims == 3) {
+            // Expected: [1, C, N] or [1, N, C]
+            if (out.size[0] != 1) {
+                return;
+            }
+            const int d1 = out.size[1];
+            const int d2 = out.size[2];
+
+            // Case A: [1, C, N], and C should be >=5 (4 + num_classes)
+            if (d1 >= 5 && d2 > 0) {
+                const int C = d1;
+                const int N = d2;
+                const int cls_count = C - 4;
+                if (cls_count <= 0) {
+                    return;
+                }
+                updateClassMetadata(cls_count);
+
+                for (int i = 0; i < N; ++i) {
+                    const float cx = out.at<float>(0, 0, i);
+                    const float cy = out.at<float>(0, 1, i);
+                    const float w  = out.at<float>(0, 2, i);
+                    const float h  = out.at<float>(0, 3, i);
+
+                    int best_cls = 0;
+                    float best_prob = out.at<float>(0, 4, i); // index 4 alignment
+                    for (int c = 1; c < cls_count; ++c) {
+                        const float p = out.at<float>(0, 4 + c, i);
+                        if (p > best_prob) {
+                            best_prob = p;
+                            best_cls = c;
+                        }
+                    }
+                    pushCandidate(cx, cy, w, h, best_cls, best_prob);
+                }
+                return;
             }
 
-            float left = (cx - 0.5f * w) * x_factor;
-            float top  = (cy - 0.5f * h) * y_factor;
-            float width = w * x_factor;
-            float height = h * y_factor;
+            // Case B: [1, N, C]
+            if (d2 >= 5 && d1 > 0) {
+                cv::Mat row_major = out.reshape(1, d1); // [N, C]
+                parseNcRows(row_major);
+            }
+            return;
+        }
 
-            // clamp to image
-            left = clampf(left, 0.0f, static_cast<float>(image.cols - 1));
-            top  = clampf(top,  0.0f, static_cast<float>(image.rows - 1));
-            width  = clampf(width,  0.0f, static_cast<float>(image.cols) - left);
-            height = clampf(height, 0.0f, static_cast<float>(image.rows) - top);
-
-            boxes.emplace_back(cv::Rect(static_cast<int>(left),
-                                        static_cast<int>(top),
-                                        static_cast<int>(width),
-                                        static_cast<int>(height)));
-            scores.push_back(conf);
-            class_ids.push_back(best_cls);
+        if (out.dims == 2) {
+            // Could be [N, C] or [C, N]
+            cv::Mat row_major = out;
+            if (row_major.cols < 5 && row_major.rows >= 5) {
+                cv::Mat t;
+                cv::transpose(row_major, t);
+                row_major = t;
+            }
+            parseNcRows(row_major);
+            return;
         }
     };
 

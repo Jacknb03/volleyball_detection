@@ -1,0 +1,1 @@
+/home/song/volleyball_detection/build/station_detector/ament_cmake_core/station_detectorConfig-version.cmake

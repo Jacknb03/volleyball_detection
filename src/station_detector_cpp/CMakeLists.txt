@@ -17,6 +17,9 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 # ---- 头文件目录 ----
 include_directories(
@@ -43,6 +46,9 @@ ament_target_dependencies(ball_detector_node
   std_msgs
   cv_bridge
   image_transport
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
 )
 
 target_link_libraries(ball_detector_node

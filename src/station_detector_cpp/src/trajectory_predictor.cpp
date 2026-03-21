@@ -2,67 +2,98 @@
 
 #include <cmath>
 
-TrajectoryPredictor::TrajectoryPredictor(double gravity)
-    : g_(gravity)
+TrajectoryPredictor::TrajectoryPredictor(double gravity,
+                                       double air_density,
+                                       double drag_coefficient,
+                                       double ball_diameter,
+                                       double ball_mass,
+                                       double integration_dt,
+                                       double max_time,
+                                       double ground_z)
+    : g_(gravity),
+      rho_(air_density),
+      cd_(drag_coefficient),
+      dt_(integration_dt),
+      max_time_(max_time),
+      ground_z_(ground_z)
 {
+    mass_ = ball_mass;
+    // Sphere projected area
+    const double r = ball_diameter * 0.5;
+    const double pi = std::acos(-1.0);
+    area_ = pi * r * r;
 }
 
-bool TrajectoryPredictor::predictLanding(const Eigen::Vector3d& pos,
-                                         const Eigen::Vector3d& vel,
+bool TrajectoryPredictor::predictLanding(const Eigen::Vector3d& pos0,
+                                         const Eigen::Vector3d& vel0,
                                          double& time_to_land,
-                                         Eigen::Vector2d& landing_xy) const
+                                         Eigen::Vector3d& landing_pos,
+                                         std::vector<Eigen::Vector3d>& path_points) const
 {
-    // 求解 z(t) = z0 + vz * t - 0.5 * g * t^2 = 0
-    // a t^2 + b t + c = 0，其中:
-    //   a = -0.5 * g
-    //   b = vz
-    //   c = z0
+    path_points.clear();
 
-    const double z0 = pos.z();
-    const double vz = vel.z();
-
-    if (g_ <= 0.0) {
+    if (dt_ <= 0.0 || max_time_ <= 0.0 || mass_ <= 0.0 || g_ <= 0.0) {
         return false;
     }
 
-    const double a = -0.5 * g_;
-    const double b = vz;
-    const double c = z0;
+    Eigen::Vector3d pos = pos0;
+    Eigen::Vector3d vel = vel0;
+    double t = 0.0;
 
-    const double discriminant = b * b - 4.0 * a * c;
-    if (discriminant < 0.0) {
-        // 抛物线不与 z=0 相交
-        return false;
+    path_points.push_back(pos);
+
+    // Semi-implicit Euler (a) update velocity then (b) update position
+    Eigen::Vector3d gravity(0.0, 0.0, -g_);
+
+    // acceleration coefficient: a_drag = -(0.5*rho*Cd*A / m) * |v| * v
+    const double k = (0.5 * rho_ * cd_ * area_) / mass_;
+
+    if (pos.z() <= ground_z_) {
+        time_to_land = 0.0;
+        landing_pos = pos;
+        landing_pos.z() = ground_z_;
+        return true;
     }
 
-    const double sqrt_d = std::sqrt(discriminant);
-    const double t1 = (-b + sqrt_d) / (2.0 * a);
-    const double t2 = (-b - sqrt_d) / (2.0 * a);
+    const int max_steps = static_cast<int>(std::ceil(max_time_ / dt_));
+    for (int step = 0; step < max_steps; ++step) {
+        const Eigen::Vector3d prev_pos = pos;
+        const Eigen::Vector3d prev_vel = vel;
 
-    // 只接受正的时间解，并选择较大的一个（更接近“真正落地时刻”）
-    double t_candidate = -1.0;
-    if (t1 > 0.0 && t2 > 0.0) {
-        t_candidate = std::max(t1, t2);
-    } else if (t1 > 0.0) {
-        t_candidate = t1;
-    } else if (t2 > 0.0) {
-        t_candidate = t2;
-    } else {
-        // 两个解都不在未来
-        return false;
+        const double speed = vel.norm();
+        Eigen::Vector3d a = gravity;
+        if (speed > 1e-6) {
+            // F_drag = -k*m * |v| * v, so a_drag = -k * |v| * v
+            a += (-k * speed) * vel;
+        }
+
+        // v_{n+1} = v_n + a_n * dt
+        vel = prev_vel + a * dt_;
+
+        // x_{n+1} = x_n + v_{n+1} * dt  (semi-implicit)
+        pos = prev_pos + vel * dt_;
+        t += dt_;
+
+        // sample path
+        path_points.push_back(pos);
+
+        if (pos.z() <= ground_z_) {
+            // Interpolate landing point more accurately
+            // prev_pos.z() > ground_z_ and pos.z() <= ground_z_
+            const double denom = (prev_pos.z() - pos.z());
+            double alpha = 1.0;
+            if (std::fabs(denom) > 1e-9) {
+                alpha = (prev_pos.z() - ground_z_) / denom; // in [0,1]
+            }
+
+            landing_pos = prev_pos + alpha * (pos - prev_pos);
+            landing_pos.z() = ground_z_;
+
+            time_to_land = t - dt_ + alpha * dt_;
+            return true;
+        }
     }
 
-    time_to_land = t_candidate;
-
-    // 水平面上做匀速运动：
-    // x(t) = x0 + vx * t
-    // y(t) = y0 + vy * t
-    const double x_land = pos.x() + vel.x() * time_to_land;
-    const double y_land = pos.y() + vel.y() * time_to_land;
-
-    landing_xy.x() = x_land;
-    landing_xy.y() = y_land;
-
-    return true;
+    return false;
 }
 

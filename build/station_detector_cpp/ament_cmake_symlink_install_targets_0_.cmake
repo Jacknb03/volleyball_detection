@@ -1,0 +1,1 @@
+ament_cmake_symlink_install_targets("TARGET_FILES" "/home/song/volleyball_detection/build/station_detector_cpp/ball_detector_node" "TARGETS" "ball_detector_node" "DESTINATION" "lib/station_detector_cpp")

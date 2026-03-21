@@ -1,0 +1,1 @@
+/home/song/volleyball_detection/build/mindvision_camera/ament_cmake_core/mindvision_cameraConfig-version.cmake

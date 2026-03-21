@@ -1,0 +1,80 @@
+[0.022s] Invoking command in '/home/song/volleyball_detection/build/mindvision_camera': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/song/volleyball_detection/src/mindvision_camera -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/song/volleyball_detection/install/mindvision_camera
+[0.158s] -- The C compiler identification is GNU 11.4.0
+[0.294s] -- The CXX compiler identification is GNU 11.4.0
+[0.312s] -- Detecting C compiler ABI info
+[0.438s] -- Detecting C compiler ABI info - done
+[0.451s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.452s] -- Detecting C compile features
+[0.452s] -- Detecting C compile features - done
+[0.458s] -- Detecting CXX compiler ABI info
+[0.598s] -- Detecting CXX compiler ABI info - done
+[0.611s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.611s] -- Detecting CXX compile features
+[0.612s] -- Detecting CXX compile features - done
+[0.615s] -- Found ament_cmake_auto: 1.3.13 (/opt/ros/humble/share/ament_cmake_auto/cmake)
+[0.891s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[1.000s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[1.214s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[1.221s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[1.233s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[1.251s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.275s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.332s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[1.335s] -- Found rmw_fastrtps_cpp: 6.2.10 (/opt/ros/humble/share/rmw_fastrtps_cpp/cmake)
+[1.434s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.2")  
+[1.482s] -- Found FastRTPS: /opt/ros/humble/include  
+[1.551s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.564s] -- Looking for pthread.h
+[1.686s] -- Looking for pthread.h - found
+[1.686s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[1.818s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[1.820s] -- Found Threads: TRUE  
+[2.033s] -- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[2.053s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[2.053s] -- Configured cppcheck include dirs: /home/song/volleyball_detection/src/mindvision_camera/mvsdk/include
+[2.053s] -- Configured cppcheck exclude dirs and/or files: 
+[2.053s] -- Added test 'flake8' to check Python code syntax and style conventions
+[2.053s] -- Added test 'lint_cmake' to check CMake code style
+[2.054s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[2.054s] -- Added test 'xmllint' to check XML markup files
+[2.056s] -- Configuring done
+[2.063s] -- Generating done
+[2.066s] -- Build files have been written to: /home/song/volleyball_detection/build/mindvision_camera
+[2.073s] Invoked command in '/home/song/volleyball_detection/build/mindvision_camera' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/song/volleyball_detection/src/mindvision_camera -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/song/volleyball_detection/install/mindvision_camera
+[2.074s] Invoking command in '/home/song/volleyball_detection/build/mindvision_camera': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/mindvision_camera -- -j20 -l20
+[2.115s] [ 25%] Building CXX object CMakeFiles/mindvision_camera_node.dir/rclcpp_components/node_main_mindvision_camera_node.cpp.o
+[2.116s] [ 50%] Building CXX object CMakeFiles/mindvision_camera.dir/src/mv_camera_node.cpp.o
+[4.611s] [ 75%] Linking CXX executable mindvision_camera_node
+[4.742s] [ 75%] Built target mindvision_camera_node
+[5.387s] [100%] Linking CXX shared library libmindvision_camera.so
+[5.542s] [100%] Built target mindvision_camera
+[5.553s] Invoked command in '/home/song/volleyball_detection/build/mindvision_camera' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/mindvision_camera -- -j20 -l20
+[5.564s] Invoking command in '/home/song/volleyball_detection/build/mindvision_camera': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/mindvision_camera
+[5.572s] -- Install configuration: ""
+[5.572s] -- Execute custom install script
+[5.572s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/lib/mindvision_camera/mindvision_camera_node
+[5.581s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/environment/library_path.sh
+[5.590s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/environment/library_path.dsv
+[5.599s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/lib/libmindvision_camera.so
+[5.609s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/config/camera_info.yaml
+[5.617s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/config/camera_params.yaml
+[5.627s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/launch/mv_launch.py
+[5.636s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/ament_index/resource_index/package_run_dependencies/mindvision_camera
+[5.644s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/ament_index/resource_index/parent_prefix_path/mindvision_camera
+[5.650s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/environment/ament_prefix_path.sh
+[5.657s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/environment/ament_prefix_path.dsv
+[5.664s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/environment/path.sh
+[5.672s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/environment/path.dsv
+[5.678s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/local_setup.bash
+[5.685s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/local_setup.sh
+[5.693s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/local_setup.zsh
+[5.699s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/local_setup.dsv
+[5.708s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/package.dsv
+[5.716s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/ament_index/resource_index/packages/mindvision_camera
+[5.725s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/ament_index/resource_index/rclcpp_components/mindvision_camera
+[5.732s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/cmake/ament_cmake_export_dependencies-extras.cmake
+[5.738s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/cmake/ament_cmake_export_libraries-extras.cmake
+[5.745s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/cmake/mindvision_cameraConfig.cmake
+[5.753s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/cmake/mindvision_cameraConfig-version.cmake
+[5.760s] -- Symlinking: /home/song/volleyball_detection/install/mindvision_camera/share/mindvision_camera/package.xml
+[5.771s] Invoked command in '/home/song/volleyball_detection/build/mindvision_camera' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/mindvision_camera

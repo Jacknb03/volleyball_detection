@@ -1,39 +1,49 @@
 ball_detector_node:
   ros__parameters:
     yolo:
-      model_path: "src\station_detector_cpp\model\best.onnx"   # 推荐用绝对路径或用 pkg_share 拼
-      model_type: "yolov8"        # 只影响日志
-      conf_threshold: 0.25        # 你建议的 0.25
+      # 注意：建议使用绝对路径。如果报错找不到模型，请改为 /home/你的用户名/volleyball_detection/src/station_detector_cpp/model/best.onnx
+      model_path: "/home/song/volleyball_detection/src/station_detector_cpp/model/best.onnx"
+      model_type: "yolov8"
+      conf_threshold: 0.1
       iou_threshold: 0.45
-      device: "auto"              # "cpu"/"cuda"/"auto"
-
-      # 与 Python 一致的“排球类别”过滤（按名字匹配）
-      volleyball_classes:
-        - "sports ball"
-        - "ball"
+      device: "auto"
+      volleyball_classes: 
+        - "volleyball"
+        - "Volleyball"
 
     kalman:
-      process_noise: 0.1
-      measurement_noise: 5.0
+      process_noise: 0.05
+      measurement_noise: 50.0
       initial_uncertainty: 10.0
-      max_missing_frames: 5
+      max_missing_frames: 15
 
     detection:
       max_jump_distance: 100.0
       min_consistent_detections: 2
       max_detections: 3
       selection_method: "confidence"
-      min_confidence: 0.25         # 与 yolo.conf_threshold 一致
+      min_confidence: 0.25
       use_tracker: true
 
     trajectory:
       prediction_time: 0.5
       num_points: 10
+      integration_dt: 0.01
+      max_time: 5.0
+      ground_z: 0.0
+
+    # 坐标系与物理参数
+    world_frame_id: "odom"
+    camera_frame_id: "camera_optical_frame"
+    air_density: 1.225
+    drag_coefficient: 0.47
 
     volleyball:
       real_radius: 0.105
-      min_depth: 0.3
-      max_depth: 5.0
+      diameter: 0.21
+      mass_kg: 0.27
+      min_depth: 0.2
+      max_depth: 40.0
 
     debug:
       enable: true

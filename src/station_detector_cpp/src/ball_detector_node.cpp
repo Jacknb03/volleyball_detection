@@ -11,12 +11,19 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2/utils.h>
+
 #include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
 #include <optional>
 #include <algorithm>
+#include <deque>
+#include <numeric>
 
 #include "yolo_inference.hpp"
 #include "ball_tracker.hpp"
@@ -56,6 +63,17 @@ public:
         declare_parameter<double>("trajectory.prediction_time", 0.5);
         declare_parameter<int>("trajectory.num_points", 10);
 
+        // 坐标系与物理参数（用于世界系 TF + 阻力预测）
+        declare_parameter<std::string>("world_frame_id", "odom");
+        declare_parameter<std::string>("camera_frame_id", "camera_optical_frame");
+
+        declare_parameter<double>("air_density", 1.225);         // kg/m^3
+        declare_parameter<double>("drag_coefficient", 0.47);    // 球的 Cd（无量纲）
+        declare_parameter<double>("volleyball.mass_kg", 0.27);   // kg，标准排球约 260-280g
+        declare_parameter<double>("trajectory.integration_dt", 0.01);
+        declare_parameter<double>("trajectory.max_time", 5.0);
+        declare_parameter<double>("trajectory.ground_z", 0.0);
+
         declare_parameter<bool>("debug.enable", true);
         declare_parameter<bool>("debug.show_fps", true);
         declare_parameter<bool>("debug.draw_trajectory", true);
@@ -70,7 +88,33 @@ public:
 
         // 初始化检测过滤和轨迹跟踪
         initTracking();
-        trajectory_predictor_ = std::make_unique<TrajectoryPredictor>();
+        world_frame_id_ = get_parameter("world_frame_id").as_string();
+        camera_frame_id_ = get_parameter("camera_frame_id").as_string();
+
+        // TF2: 相机坐标系 -> 世界坐标系
+        tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+        // 物理参数初始化（用于欧拉积分预测）
+        const double gravity = 9.81;
+        const double air_density = get_parameter("air_density").as_double();
+        const double drag_coefficient = get_parameter("drag_coefficient").as_double();
+        double diameter = get_parameter("volleyball.diameter").as_double();
+        if (diameter <= 0.0) {
+            // 兼容：如果 YAML 没填 diameter，则用 real_radius*2
+            const double r = get_parameter("volleyball.real_radius").as_double();
+            if (r > 0.0) {
+                diameter = 2.0 * r;
+            }
+        }
+        const double mass_kg = get_parameter("volleyball.mass_kg").as_double();
+        const double integration_dt = get_parameter("trajectory.integration_dt").as_double();
+        const double max_time = get_parameter("trajectory.max_time").as_double();
+        const double ground_z = get_parameter("trajectory.ground_z").as_double();
+
+        trajectory_predictor_ = std::make_unique<TrajectoryPredictor>(
+            gravity, air_density, drag_coefficient, diameter, mass_kg,
+            integration_dt, max_time, ground_z);
 
         // QoS：实时性优先
         rclcpp::QoS qos(rclcpp::KeepLast(1));
@@ -180,7 +224,8 @@ private:
         const double cy = camera_matrix_.at<double>(1, 2);
         double diameter = get_parameter("volleyball.diameter").as_double();
         if (diameter <= 0.0) {
-            diameter = 0.225;
+            const double r = get_parameter("volleyball.real_radius").as_double();
+            diameter = (r > 0.0) ? (2.0 * r) : 0.225;
         }
         position_estimator_ = std::make_unique<BallPositionEstimator>(
             fx, fy, cx, cy, diameter);
@@ -192,19 +237,13 @@ private:
         return s;
     }
 
-    static const std::vector<std::string>& coco80Names()
-    {
-        static const std::vector<std::string> names = YOLODetector::coco80Names();
-        return names;
-    }
-
     bool isVolleyballClass(int class_id) const
     {
-        const auto& names = coco80Names();
-        if (class_id < 0 || class_id >= (int)names.size()) {
+        if (!yolo_detector_) {
             return false;
         }
-        const std::string cls_name = toLower(names[class_id]);
+
+        const std::string cls_name = toLower(yolo_detector_->getClassName(class_id));
 
         auto allowed = get_parameter("yolo.volleyball_classes").as_string_array();
         for (const auto& a : allowed) {
@@ -288,12 +327,12 @@ private:
             }
         }
 
-        // 5) 验证检测（对齐 Python DetectionValidator.validate）
-        std::optional<cv::Point2f> measurement = std::nullopt;
+        // 5) 验证检测 -> 估计相机 3D -> TF 到 world（对齐：YOLO -> Estimator -> TF -> KF）
+        std::optional<Eigen::Vector3d> measurement_world = std::nullopt;
         if (has_best) {
             float cx = best_det.x + best_det.width * 0.5f;
             float cy = best_det.y + best_det.height * 0.5f;
-            last_bbox_height_ = static_cast<double>(best_det.height);
+            updateBboxHeightHistory(static_cast<double>(best_det.height));
 
             bool ok = detection_filter_->validate(
                 cx, cy,
@@ -301,124 +340,133 @@ private:
                 frame.cols, frame.rows);
 
             if (ok) {
-                measurement = cv::Point2f(cx, cy);
-                last_detection_time_valid_ = true;
-                last_detection_time_ = now_time;
-            } else {
-                measurement = std::nullopt;
+                if (camera_info_received_ && position_estimator_) {
+                    Eigen::Vector3d pos_cam;
+                    if (position_estimator_->estimate(cx, cy, getSmoothedBboxHeight(), pos_cam)) {
+                        const double min_depth = get_parameter("volleyball.min_depth").as_double();
+                        const double max_depth = get_parameter("volleyball.max_depth").as_double();
+                        if (pos_cam.z() >= min_depth && pos_cam.z() <= max_depth) {
+                            // 相机坐标系 -> world 坐标系
+                            std::optional<Eigen::Vector3d> pos_world =
+                                transformCameraToWorld(pos_cam, msg->header, now_time);
+                            if (pos_world.has_value()) {
+                                measurement_world = pos_world.value();
+                            }
+                        }
+                    }
+                }
+
+                if (measurement_world.has_value()) {
+                    last_detection_time_valid_ = true;
+                    last_detection_time_ = now_time;
+                }
             }
         }
 
         // 6) 卡尔曼滤波更新（含丢帧预测）
-        cv::Point2f est_pos = ball_tracker_->updateWithMissing(measurement, timestamp_sec);
+        ball_tracker_->updateWithMissing(measurement_world, timestamp_sec);
         bool valid_track = ball_tracker_->isInitialized();
 
-        // 7) 估计 3D pose（对齐 Python _estimate_3d_pose: 固定 depth=2.0 + 内参反投影 + depth范围限制）
-        if (camera_info_received_ && valid_track) {
-            std::optional<geometry_msgs::msg::PoseStamped> pose =
-                estimate3dPose(est_pos, msg->header);
-            if (pose.has_value()) {
-                pose_pub_->publish(*pose);
+        // 7) 发布 world pose + KF 状态，并进行世界系轨迹预测/可视化
+        if (valid_track) {
+            const Eigen::Vector3d pos_world = ball_tracker_->getPosition();
+            const Eigen::Vector3d vel_world = ball_tracker_->getVelocity();
+            RCLCPP_INFO_THROTTLE(
+                get_logger(), *this->get_clock(), 500,
+                "Tracking Ball at [%.3f, %.3f, %.3f]",
+                pos_world.x(), pos_world.y(), pos_world.z());
 
-                // 基于 3D 位姿和历史位姿估计 3D 速度，并进行落点预测
-                Eigen::Vector3d pos3(
-                    pose->pose.position.x,
-                    pose->pose.position.y,
-                    pose->pose.position.z);
+            // /volleyball_pose（world frame）
+            geometry_msgs::msg::PoseStamped pose;
+            pose.header = msg->header;
+            pose.header.frame_id = world_frame_id_;
+            pose.pose.position.x = pos_world.x();
+            pose.pose.position.y = pos_world.y();
+            pose.pose.position.z = pos_world.z();
+            pose.pose.orientation.w = 1.0;
+            pose.pose.orientation.x = 0.0;
+            pose.pose.orientation.y = 0.0;
+            pose.pose.orientation.z = 0.0;
+            pose_pub_->publish(pose);
 
-                Eigen::Vector3d vel3(0.0, 0.0, 0.0);
-                bool have_velocity = false;
-                if (last_pose_valid_) {
-                    double dt = timestamp_sec - last_pose_time_;
-                    if (dt > 1e-4) {
-                        vel3 = (pos3 - last_pose_) / dt;
-                        have_velocity = true;
-                    }
-                }
+            publishBallState(pos_world, vel_world);
 
-                last_pose_ = pos3;
-                last_pose_time_ = timestamp_sec;
-                last_pose_valid_ = true;
-
-                // 发布当前状态（位置）
-                publishBallState(pos3, vel3);
-
-                // 轨迹预测（仅在已有速度估计时进行）
-                if (have_velocity) {
-                    double t_land = 0.0;
-                    Eigen::Vector2d landing_xy(0.0, 0.0);
-                    if (trajectory_predictor_->predictLanding(pos3, vel3, t_land, landing_xy)) {
-                        publishBallPrediction(landing_xy, t_land);
-                    }
-                }
-
-                if (get_parameter("debug.enable").as_bool()) {
-                    publishTrajectory(msg->header);
-                }
-            }
+            // 预测并发布 marker（world frame）
+            publishWorldTrajectory(msg->header, pos_world, vel_world);
         }
 
         // 8) 生成并发布调试图像（对齐 Python: 用 volleyball_detections + best + kalman_state）
         if (get_parameter("debug.enable").as_bool()) {
             publishDebugImage(msg->header, frame, volleyball_detections,
                               has_best ? &best_det : nullptr,
-                              valid_track ? &est_pos : nullptr,
                               now_time);
         }
 
         last_frame_time_ = now_time;
     }
 
-    std::optional<geometry_msgs::msg::PoseStamped> estimate3dPose(
-        const cv::Point2f& image_center,
-        const std_msgs::msg::Header& header) const
+    std::optional<Eigen::Vector3d> transformCameraToWorld(
+        const Eigen::Vector3d& pos_cam,
+        const std_msgs::msg::Header& header,
+        const rclcpp::Time& now_time) const
     {
-        if (!camera_info_received_ || !position_estimator_) {
+        if (!tf_buffer_) {
             return std::nullopt;
         }
 
-        // 防止 bbox 过小导致深度爆炸
-        if (last_bbox_height_ < 10.0) {
+        geometry_msgs::msg::PointStamped p_in;
+        p_in.header.stamp = header.stamp;
+        // 兼容：视频/仿真可能不给 frame_id
+        p_in.header.frame_id =
+            (!header.frame_id.empty()) ? header.frame_id : camera_frame_id_;
+
+        // 若时间戳是 0（极端情况），使用当前时间
+        if (p_in.header.stamp.sec == 0 && p_in.header.stamp.nanosec == 0) {
+            p_in.header.stamp = now_time;
+        }
+
+        p_in.point.x = pos_cam.x();
+        p_in.point.y = pos_cam.y();
+        p_in.point.z = pos_cam.z();
+
+        geometry_msgs::msg::PointStamped p_out;
+        try {
+            // 等待很短，保证实时性
+            const tf2::Duration timeout = tf2::durationFromSec(0.05);
+            p_out = tf_buffer_->transform(p_in, world_frame_id_, timeout);
+        } catch (const tf2::TransformException& ex) {
+            RCLCPP_WARN(get_logger(), "TF transform camera->world failed: %s", ex.what());
             return std::nullopt;
         }
 
-        const double min_depth = get_parameter("volleyball.min_depth").as_double();
-        const double max_depth = get_parameter("volleyball.max_depth").as_double();
+        return Eigen::Vector3d(p_out.point.x, p_out.point.y, p_out.point.z);
+    }
 
-        Eigen::Vector3d pos_cam;
-        if (!position_estimator_->estimate(
-                static_cast<double>(image_center.x),
-                static_cast<double>(image_center.y),
-                last_bbox_height_,
-                pos_cam)) {
-            return std::nullopt;
+    void updateBboxHeightHistory(double bbox_height)
+    {
+        if (bbox_height <= 0.0) {
+            return;
         }
-
-        const double X = pos_cam.x();
-        const double Y = pos_cam.y();
-        const double Z = pos_cam.z();
-
-        if (Z < min_depth || Z > max_depth) {
-            return std::nullopt;
+        bbox_height_history_.push_back(bbox_height);
+        while (bbox_height_history_.size() > kBboxHeightWindowSize) {
+            bbox_height_history_.pop_front();
         }
+    }
 
-        geometry_msgs::msg::PoseStamped pose;
-        pose.header = header;
-        pose.header.frame_id = header.frame_id;
-        pose.pose.position.x = X;
-        pose.pose.position.y = Y;
-        pose.pose.position.z = Z;
-        pose.pose.orientation.w = 1.0;
-        pose.pose.orientation.x = 0.0;
-        pose.pose.orientation.y = 0.0;
-        pose.pose.orientation.z = 0.0;
-
-        return pose;
+    double getSmoothedBboxHeight() const
+    {
+        if (bbox_height_history_.empty()) {
+            return 0.0;
+        }
+        const double sum = std::accumulate(bbox_height_history_.begin(),
+                                           bbox_height_history_.end(), 0.0);
+        return sum / static_cast<double>(bbox_height_history_.size());
     }
 
     void publishBallState(const Eigen::Vector3d& pos,
                           const Eigen::Vector3d& vel)
     {
+        (void)vel; // 当前话题仅发布位置
         // 简单实现：/ball_state 使用 geometry_msgs/Point，仅携带当前位置 (x,y,z)
         geometry_msgs::msg::Point msg;
         msg.x = pos.x();
@@ -427,60 +475,89 @@ private:
         ball_state_pub_->publish(msg);
     }
 
-    void publishBallPrediction(const Eigen::Vector2d& landing_xy,
+    void publishBallPrediction(const Eigen::Vector3d& landing_pos,
                                double time_to_land)
     {
         // /ball_prediction: x,y 为落地点，z 为 time_to_land
         geometry_msgs::msg::Point msg;
-        msg.x = landing_xy.x();
-        msg.y = landing_xy.y();
+        msg.x = landing_pos.x();
+        msg.y = landing_pos.y();
         msg.z = time_to_land;
         ball_prediction_pub_->publish(msg);
     }
 
-    void publishTrajectory(const std_msgs::msg::Header& header)
+    void publishWorldTrajectory(const std_msgs::msg::Header& header,
+                                 const Eigen::Vector3d& pos_world,
+                                 const Eigen::Vector3d& vel_world)
     {
-        if (!ball_tracker_->isInitialized()) {
+        if (!trajectory_predictor_ || !ball_tracker_->isInitialized()) {
             return;
         }
 
-        double pred_time =
-            get_parameter("trajectory.prediction_time").as_double();
-        int num_points =
-            get_parameter("trajectory.num_points").as_int();
+        double t_land = 0.0;
+        Eigen::Vector3d landing_pos(0.0, 0.0, 0.0);
+        std::vector<Eigen::Vector3d> path_points;
 
-        auto future_positions = ball_tracker_->predictFuture(
-            static_cast<float>(pred_time), num_points);
-
-        if (future_positions.empty()) {
+        if (!trajectory_predictor_->predictLanding(pos_world, vel_world, t_land, landing_pos, path_points)) {
             return;
         }
 
+        publishBallPrediction(landing_pos, t_land);
+
+        // world marker
         visualization_msgs::msg::MarkerArray array;
 
         visualization_msgs::msg::Marker line;
-        line.header = header;
+        line.header.stamp = header.stamp;
+        line.header.frame_id = world_frame_id_;
         line.ns = "volleyball_trajectory";
         line.id = 0;
         line.type = visualization_msgs::msg::Marker::LINE_STRIP;
         line.action = visualization_msgs::msg::Marker::ADD;
-        line.scale.x = 0.02; // 对齐 Python: 0.02
+        line.scale.x = 0.02;
 
         line.color.r = 1.0f;
-        line.color.g = 0.0f;
+        line.color.g = 0.2f;
         line.color.b = 0.0f;
         line.color.a = 1.0f;
 
-        for (const auto& p : future_positions) {
+        for (const auto& p : path_points) {
             geometry_msgs::msg::Point pt;
-            // 对齐 Python: 使用图像坐标/100
-            pt.x = static_cast<double>(p.x) / 100.0;
-            pt.y = static_cast<double>(p.y) / 100.0;
-            pt.z = 0.0;
+            pt.x = p.x();
+            pt.y = p.y();
+            pt.z = p.z();
             line.points.push_back(pt);
         }
 
+        visualization_msgs::msg::Marker sphere;
+        sphere.header.stamp = header.stamp;
+        sphere.header.frame_id = world_frame_id_;
+        sphere.ns = "volleyball_landing";
+        sphere.id = 1;
+        sphere.type = visualization_msgs::msg::Marker::SPHERE;
+        sphere.action = visualization_msgs::msg::Marker::ADD;
+
+        double diameter = get_parameter("volleyball.diameter").as_double();
+        if (diameter <= 0.0) {
+            const double r = get_parameter("volleyball.real_radius").as_double();
+            diameter = (r > 0.0) ? (2.0 * r) : 0.225;
+        }
+
+        sphere.scale.x = diameter;
+        sphere.scale.y = diameter;
+        sphere.scale.z = diameter;
+        sphere.color.r = 0.0f;
+        sphere.color.g = 1.0f;
+        sphere.color.b = 0.0f;
+        sphere.color.a = 1.0f;
+
+        sphere.pose.orientation.w = 1.0;
+        sphere.pose.position.x = landing_pos.x();
+        sphere.pose.position.y = landing_pos.y();
+        sphere.pose.position.z = landing_pos.z();
+
         array.markers.push_back(line);
+        array.markers.push_back(sphere);
         traj_pub_->publish(array);
     }
 
@@ -488,7 +565,6 @@ private:
                            const cv::Mat& frame,
                            const std::vector<Detection>& detections,
                            const Detection* best_det,
-                           const cv::Point2f* track_pos,
                            const rclcpp::Time& now_time)
     {
         cv::Mat debug = frame.clone();
@@ -506,9 +582,8 @@ private:
             cv::circle(debug, cv::Point(cx, cy), 3, cv::Scalar(0, 255, 255), -1);
 
             // label: class_name: conf
-            const auto& names = coco80Names();
-            std::string cls = (det.class_id >= 0 && det.class_id < (int)names.size())
-                                ? names[det.class_id]
+            std::string cls = yolo_detector_
+                                ? yolo_detector_->getClassName(det.class_id)
                                 : "class";
             char buf[128];
             std::snprintf(buf, sizeof(buf), "%s: %.2f", cls.c_str(), (double)det.confidence);
@@ -527,46 +602,6 @@ private:
             int cx = (int)(best_det->x + best_det->width * 0.5f);
             int cy = (int)(best_det->y + best_det->height * 0.5f);
             cv::circle(debug, cv::Point(cx, cy), 5, cv::Scalar(0, 255, 0), -1);
-        }
-
-        // 对齐 Python: 绘制卡尔曼滤波结果（红色） + 速度箭头 + 预测点
-        if (track_pos && ball_tracker_->isInitialized()) {
-            cv::Point2f vel = ball_tracker_->getVelocity();
-            int kf_cx = (int)track_pos->x;
-            int kf_cy = (int)track_pos->y;
-            cv::circle(debug,
-                       cv::Point(kf_cx, kf_cy),
-                       8, cv::Scalar(0, 0, 255), 2);
-
-            // velocity arrow (vel_scale=10.0)
-            const float vel_scale = 10.0f;
-            int end_x = (int)(kf_cx + vel.x * vel_scale);
-            int end_y = (int)(kf_cy + vel.y * vel_scale);
-            cv::arrowedLine(debug, cv::Point(kf_cx, kf_cy), cv::Point(end_x, end_y),
-                            cv::Scalar(0, 0, 255), 2, cv::LINE_AA, 0, 0.3);
-
-            if (get_parameter("debug.draw_trajectory").as_bool()) {
-                double pred_time =
-                    get_parameter("trajectory.prediction_time").as_double();
-                int num_points =
-                    get_parameter("trajectory.num_points").as_int();
-
-                auto future_positions = ball_tracker_->predictFuture(
-                    static_cast<float>(pred_time), num_points);
-
-                for (size_t i = 0; i < future_positions.size(); ++i) {
-                    const auto& p = future_positions[i];
-                    int px = static_cast<int>(p.x);
-                    int py = static_cast<int>(p.y);
-                    if (px < 0 || py < 0 || px >= debug.cols || py >= debug.rows) {
-                        continue;
-                    }
-                    float alpha = static_cast<float>(i) /
-                                  static_cast<float>(future_positions.size());
-                    cv::Scalar color((int)(255 * alpha), 0, (int)(255 * (1.0f - alpha)));
-                    cv::circle(debug, cv::Point(px, py), 2, color, -1);
-                }
-            }
         }
 
         // 绘制状态信息（对齐 Python）
@@ -628,6 +663,11 @@ private:
     std::unique_ptr<TrajectoryPredictor> trajectory_predictor_;
     std::unique_ptr<BallPositionEstimator> position_estimator_;
 
+    std::string world_frame_id_;
+    std::string camera_frame_id_;
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
@@ -643,12 +683,8 @@ private:
     bool camera_info_received_{false};
     cv::Mat camera_matrix_;
     cv::Mat distortion_coeffs_;
-    double last_bbox_height_{0.0};
-
-    // 用于估计 3D 速度的历史位姿
-    Eigen::Vector3d last_pose_{0.0, 0.0, 0.0};
-    double last_pose_time_{0.0};
-    bool last_pose_valid_{false};
+    static constexpr size_t kBboxHeightWindowSize = 5;
+    std::deque<double> bbox_height_history_;
 };
 
 int main(int argc, char** argv)

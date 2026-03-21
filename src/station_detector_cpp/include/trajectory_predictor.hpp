@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <vector>
 
 /**
  * TrajectoryPredictor
@@ -19,23 +20,46 @@
 class TrajectoryPredictor
 {
 public:
-    explicit TrajectoryPredictor(double gravity = 9.81);
+    explicit TrajectoryPredictor(double gravity,
+                                   double air_density,
+                                   double drag_coefficient,
+                                   double ball_diameter,
+                                   double ball_mass,
+                                   double integration_dt = 0.01,
+                                   double max_time = 5.0,
+                                   double ground_z = 0.0);
 
     /**
-     * 预测落地点
+     * 数值积分预测落地点与轨迹
      *
-     * @param pos            当前 3D 位置 (x, y, z)
-     * @param vel            当前 3D 速度 (vx, vy, vz)
-     * @param time_to_land   输出：着地时间（秒）
-     * @param landing_xy     输出：着地点 (x, y)
-     * @return               是否预测成功（若当前抛物线不会落到 z=0，则返回 false）
+     * 运动模型：
+     * - 重力：a_gravity = (0, 0, -g)
+     * - 二次阻力：F_drag = -0.5 * rho * Cd * Area * |v| * v
+     *   a_drag = F_drag / m
+     *
+     * 使用 Euler 数值积分，迭代至 World_Z <= ground_z。
+     *
+     * @param pos             初始世界系位置 (x, y, z)
+     * @param vel             初始世界系速度 (vx, vy, vz)
+     * @param time_to_land    输出：着地时间（秒）
+     * @param landing_pos     输出：着地点 (x, y, z=ground_z)
+     * @param path_points     输出：离散轨迹点（包含初末点）
+     * @return                是否预测成功（未在 max_time 内落地返回 false）
      */
     bool predictLanding(const Eigen::Vector3d& pos,
-                        const Eigen::Vector3d& vel,
-                        double& time_to_land,
-                        Eigen::Vector2d& landing_xy) const;
+                         const Eigen::Vector3d& vel,
+                         double& time_to_land,
+                         Eigen::Vector3d& landing_pos,
+                         std::vector<Eigen::Vector3d>& path_points) const;
 
 private:
-    double g_; // 重力加速度
+    double g_;             // 重力加速度
+    double rho_;           // 空气密度
+    double cd_;            // 阻力系数
+    double area_;          // 球迎风面积
+    double mass_;          // 球质量
+    double dt_;            // 积分步长
+    double max_time_;      // 最大积分时长
+    double ground_z_;     // 地面高度（世界系 Z <= ground_z 表示落地）
 };
 

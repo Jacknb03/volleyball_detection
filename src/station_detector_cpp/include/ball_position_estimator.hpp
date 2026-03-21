@@ -67,8 +67,9 @@ public:
             return false;
         }
 
-        // 深度估计
-        const double Z = fx_ * ball_diameter_ / bbox_height;
+        // 深度估计（使用像素高度对应竖直焦距 fy）
+        // pinhole: bbox_height_pixels / fy = ball_diameter_meters / Z  =>  Z = fy * D / bbox_height
+        const double Z = fy_ * ball_diameter_ / bbox_height;
 
         // 反投影到相机坐标系
         const double X = (u - cx_) * Z / fx_;

@@ -1,0 +1,1 @@
+ament_cmake_symlink_install_targets("TARGET_FILES" "/home/song/volleyball_detection/build/station_detector/station_pose_estimator" "TARGETS" "station_pose_estimator" "DESTINATION" "lib/station_detector")

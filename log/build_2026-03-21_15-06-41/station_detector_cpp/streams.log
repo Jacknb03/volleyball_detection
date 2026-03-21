@@ -1,0 +1,32 @@
+[0.009s] Invoking command in '/home/song/volleyball_detection/build/station_detector_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/station_detector_cpp -- -j20 -l20
+[0.120s] [ 14%] Building CXX object CMakeFiles/ball_detector_node.dir/src/ball_detector_node.cpp.o
+[0.120s] [ 28%] Building CXX object CMakeFiles/ball_detector_node.dir/src/yolo_inference.cpp.o
+[8.478s] [ 42%] Linking CXX executable ball_detector_node
+[9.442s] [100%] Built target ball_detector_node
+[9.456s] Invoked command in '/home/song/volleyball_detection/build/station_detector_cpp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/station_detector_cpp -- -j20 -l20
+[9.473s] Invoking command in '/home/song/volleyball_detection/build/station_detector_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/station_detector_cpp
+[9.485s] -- Install configuration: ""
+[9.486s] -- Execute custom install script
+[9.487s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/lib/station_detector_cpp/ball_detector_node
+[9.487s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/ball_position_estimator.hpp
+[9.488s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/ball_tracker.hpp
+[9.488s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/detection_filter.hpp
+[9.488s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/trajectory_predictor.hpp
+[9.488s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/yolo_inference.hpp
+[9.488s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/ball_detector_params.yaml
+[9.488s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/package_run_dependencies/station_detector_cpp
+[9.489s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/parent_prefix_path/station_detector_cpp
+[9.489s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/ament_prefix_path.sh
+[9.489s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/ament_prefix_path.dsv
+[9.490s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/path.sh
+[9.490s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/path.dsv
+[9.490s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.bash
+[9.490s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.sh
+[9.491s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.zsh
+[9.491s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.dsv
+[9.491s] -- Symlinking: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/package.dsv
+[9.507s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/packages/station_detector_cpp
+[9.507s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/cmake/station_detector_cppConfig.cmake
+[9.507s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/cmake/station_detector_cppConfig-version.cmake
+[9.507s] -- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/package.xml
+[9.510s] Invoked command in '/home/song/volleyball_detection/build/station_detector_cpp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/station_detector_cpp

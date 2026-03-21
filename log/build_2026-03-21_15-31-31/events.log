@@ -1,0 +1,140 @@
+[0.000000] (-) TimerEvent: {}
+[0.000286] (-) JobUnselected: {'identifier': 'mindvision_camera'}
+[0.000370] (-) JobUnselected: {'identifier': 'station_detector'}
+[0.000414] (station_detector_cpp) JobQueued: {'identifier': 'station_detector_cpp', 'dependencies': OrderedDict()}
+[0.000474] (station_detector_cpp) JobStarted: {'identifier': 'station_detector_cpp'}
+[0.007290] (station_detector_cpp) JobProgress: {'identifier': 'station_detector_cpp', 'progress': 'cmake'}
+[0.008221] (station_detector_cpp) JobProgress: {'identifier': 'station_detector_cpp', 'progress': 'build'}
+[0.009364] (station_detector_cpp) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/song/volleyball_detection/build/station_detector_cpp', '--', '-j20', '-l20'], 'cwd': '/home/song/volleyball_detection/build/station_detector_cpp', 'env': OrderedDict([('GJS_DEBUG_TOPICS', 'JS ERROR;JS LOG'), ('LESSOPEN', '| /usr/bin/lesspipe %s'), ('VSCODE_CWD', '/home/song'), ('CURSOR_EXTENSION_HOST_ROLE', 'agent-exec'), ('VSCODE_ESM_ENTRYPOINT', 'vs/workbench/api/node/extensionHostProcess'), ('LANGUAGE', 'en_US:en'), ('USER', 'song'), ('LC_TIME', 'zh_CN.UTF-8'), ('VSCODE_NLS_CONFIG', '{"userLocale":"en-us","osLocale":"en-us","resolvedLanguage":"en","defaultMessagesFile":"/usr/share/cursor/resources/app/out/nls.messages.json","locale":"en-us","availableLanguages":{}}'), ('CI', '1'), ('VSCODE_HANDLES_UNCAUGHT_ERRORS', 'true'), ('XDG_SESSION_TYPE', 'wayland'), ('SHLVL', '1'), ('LD_LIBRARY_PATH', '/usr/local/lib:/usr/local/lib:/usr/local/lib:/home/song/cv_bridge_ws/install/cv_bridge/lib:/usr/lib/x86_64-linux-gnu/gazebo-11/plugins:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib:/usr/local/lib:'), ('HOME', '/home/song'), ('CHROME_DESKTOP', 'cursor.desktop'), ('OLDPWD', '/home/song/volleyball_detection'), ('DESKTOP_SESSION', 'ubuntu'), ('VSCODE_IPC_HOOK', '/run/user/1000/vscode-8dcdf1b3-2.6.-main.sock'), ('GIO_LAUNCHED_DESKTOP_FILE', '/usr/share/applications/cursor.desktop'), ('GAZEBO_MASTER_URI', 'http://localhost:11345'), ('ROS_PYTHON_VERSION', '3'), ('GNOME_SHELL_SESSION_MODE', 'ubuntu'), ('GTK_MODULES', 'gail:atk-bridge'), ('LC_MONETARY', 'zh_CN.UTF-8'), ('CURSOR_WORKSPACE_LABEL', 'volleyball_detection'), ('MANAGERPID', '1734'), ('SYSTEMD_EXEC_PID', '1903'), ('IM_CONFIG_CHECK_ENV', '1'), ('NO_COLOR', '1'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('GIO_LAUNCHED_DESKTOP_FILE_PID', '3261'), ('VSCODE_CRASH_REPORTER_PROCESS_TYPE', 'extensionHost'), ('IM_CONFIG_PHASE', '1'), ('WAYLAND_DISPLAY', 'wayland-0'), ('COLCON_PREFIX_PATH', '/home/song/cv_bridge_ws/install'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'song'), ('FORCE_COLOR', '0'), ('JOURNAL_STREAM', '8:12809'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('PKG_CONFIG_PATH', '/usr/local/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib/pkgconfig:'), ('XDG_SESSION_CLASS', 'user'), ('USERNAME', 'song'), ('TERM', 'dumb'), ('GAZEBO_MODEL_PATH', '/usr/share/gazebo-11/models:/home/song/.gazebo/models'), ('GNOME_DESKTOP_SESSION_ID', 'this-is-deprecated'), ('FC_FONTATIONS', '1'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/home/song/.local/bin:/home/song/.local/bin:/opt/ros/humble/bin:/home/song/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'), ('SESSION_MANAGER', 'local/JSong:@/tmp/.ICE-unix/1878,unix/JSong:/tmp/.ICE-unix/1878'), ('INVOCATION_ID', 'ae99d94a2a2b4ab2879df1168288cf9e'), ('PAPERSIZE', 'a4'), ('XDG_MENU_PREFIX', 'gnome-'), ('LC_ADDRESS', 'zh_CN.UTF-8'), ('VSCODE_PROCESS_TITLE', 'extension-host (agent-exec) volleyball_detection [1-3]'), ('GNOME_SETUP_DISPLAY', ':1'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('GDK_BACKEND', 'wayland'), ('CURSOR_AGENT', '1'), ('DISPLAY', ':0'), ('LANG', 'en_US.UTF-8'), ('XDG_CURRENT_DESKTOP', 'ubuntu:GNOME'), ('LC_TELEPHONE', 'zh_CN.UTF-8'), ('XMODIFIERS', '@im=ibus'), ('XDG_SESSION_DESKTOP', 'ubuntu'), ('XAUTHORITY', '/run/user/1000/.mutter-Xwaylandauth.XWK8L3'), ('LS_COLORS', ''), ('CURSOR_TRACE_ID', '3d88cd416b244f418a64a93a083dd528'), ('SSH_AGENT_LAUNCHER', 'gnome-keyring'), ('SSH_AUTH_SOCK', '/run/user/1000/keyring/ssh'), ('AMENT_PREFIX_PATH', '/home/song/cv_bridge_ws/install/cv_bridge:/opt/ros/humble'), ('SHELL', '/bin/bash'), ('LC_NAME', 'zh_CN.UTF-8'), ('QT_ACCESSIBILITY', '1'), ('GDMSESSION', 'ubuntu'), ('LESSCLOSE', '/usr/bin/lesspipe %s %s'), ('LC_MEASUREMENT', 'zh_CN.UTF-8'), ('GAZEBO_RESOURCE_PATH', '/usr/share/gazebo-11:/usr/share/gazebo-11:'), ('GJS_DEBUG_OUTPUT', 'stderr'), ('OpenCV_DIR', '/usr/local'), ('LC_IDENTIFICATION', 'zh_CN.UTF-8'), ('QT_IM_MODULE', 'ibus'), ('PWD', '/home/song/volleyball_detection/build/station_detector_cpp'), ('LC_ALL', 'en_US.UTF-8'), ('XDG_CONFIG_DIRS', '/etc/xdg/xdg-ubuntu:/etc/xdg'), ('VSCODE_CODE_CACHE_PATH', '/home/song/.config/Cursor/CachedData/b29eb4ee5f9f6d1cb2afbc09070198d3ea6ad760'), ('XDG_DATA_DIRS', '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/song/cv_bridge_ws/install/cv_bridge/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('LC_NUMERIC', 'zh_CN.UTF-8'), ('LC_PAPER', 'zh_CN.UTF-8'), ('COLCON', '1'), ('_ZO_DOCTOR', '0'), ('CMAKE_PREFIX_PATH', '/home/song/cv_bridge_ws/install/cv_bridge:/opt/ros/humble'), ('VSCODE_PID', '3261')]), 'shell': False}
+[0.096156] (station_detector_cpp) StdoutLine: {'line': b'Consolidate compiler generated dependencies of target ball_detector_node\n'}
+[0.099831] (-) TimerEvent: {}
+[0.126899] (station_detector_cpp) StdoutLine: {'line': b'[ 14%] Building CXX object CMakeFiles/ball_detector_node.dir/src/ball_tracker.cpp.o\n'}
+[0.127351] (station_detector_cpp) StdoutLine: {'line': b'[ 28%] Building CXX object CMakeFiles/ball_detector_node.dir/src/ball_detector_node.cpp.o\n'}
+[0.199971] (-) TimerEvent: {}
+[0.300297] (-) TimerEvent: {}
+[0.400637] (-) TimerEvent: {}
+[0.500938] (-) TimerEvent: {}
+[0.601213] (-) TimerEvent: {}
+[0.701536] (-) TimerEvent: {}
+[0.801759] (-) TimerEvent: {}
+[0.902029] (-) TimerEvent: {}
+[1.002287] (-) TimerEvent: {}
+[1.102534] (-) TimerEvent: {}
+[1.202719] (-) TimerEvent: {}
+[1.302942] (-) TimerEvent: {}
+[1.403185] (-) TimerEvent: {}
+[1.503425] (-) TimerEvent: {}
+[1.603701] (-) TimerEvent: {}
+[1.703922] (-) TimerEvent: {}
+[1.804137] (-) TimerEvent: {}
+[1.904371] (-) TimerEvent: {}
+[2.004591] (-) TimerEvent: {}
+[2.104819] (-) TimerEvent: {}
+[2.205042] (-) TimerEvent: {}
+[2.305330] (-) TimerEvent: {}
+[2.405557] (-) TimerEvent: {}
+[2.505799] (-) TimerEvent: {}
+[2.606018] (-) TimerEvent: {}
+[2.706303] (-) TimerEvent: {}
+[2.806504] (-) TimerEvent: {}
+[2.906723] (-) TimerEvent: {}
+[3.006914] (-) TimerEvent: {}
+[3.107098] (-) TimerEvent: {}
+[3.207386] (-) TimerEvent: {}
+[3.307578] (-) TimerEvent: {}
+[3.407807] (-) TimerEvent: {}
+[3.508047] (-) TimerEvent: {}
+[3.608263] (-) TimerEvent: {}
+[3.708548] (-) TimerEvent: {}
+[3.808805] (-) TimerEvent: {}
+[3.909044] (-) TimerEvent: {}
+[4.009263] (-) TimerEvent: {}
+[4.109569] (-) TimerEvent: {}
+[4.209748] (-) TimerEvent: {}
+[4.310020] (-) TimerEvent: {}
+[4.410275] (-) TimerEvent: {}
+[4.510459] (-) TimerEvent: {}
+[4.610689] (-) TimerEvent: {}
+[4.710946] (-) TimerEvent: {}
+[4.811177] (-) TimerEvent: {}
+[4.911462] (-) TimerEvent: {}
+[5.011696] (-) TimerEvent: {}
+[5.111909] (-) TimerEvent: {}
+[5.212134] (-) TimerEvent: {}
+[5.312380] (-) TimerEvent: {}
+[5.412572] (-) TimerEvent: {}
+[5.512842] (-) TimerEvent: {}
+[5.613075] (-) TimerEvent: {}
+[5.713286] (-) TimerEvent: {}
+[5.813560] (-) TimerEvent: {}
+[5.913766] (-) TimerEvent: {}
+[6.013974] (-) TimerEvent: {}
+[6.114192] (-) TimerEvent: {}
+[6.214421] (-) TimerEvent: {}
+[6.314660] (-) TimerEvent: {}
+[6.414935] (-) TimerEvent: {}
+[6.515243] (-) TimerEvent: {}
+[6.615546] (-) TimerEvent: {}
+[6.715810] (-) TimerEvent: {}
+[6.816052] (-) TimerEvent: {}
+[6.916253] (-) TimerEvent: {}
+[7.016491] (-) TimerEvent: {}
+[7.116666] (-) TimerEvent: {}
+[7.216870] (-) TimerEvent: {}
+[7.317103] (-) TimerEvent: {}
+[7.417390] (-) TimerEvent: {}
+[7.517540] (-) TimerEvent: {}
+[7.617701] (-) TimerEvent: {}
+[7.717869] (-) TimerEvent: {}
+[7.818018] (-) TimerEvent: {}
+[7.918196] (-) TimerEvent: {}
+[8.018399] (-) TimerEvent: {}
+[8.118546] (-) TimerEvent: {}
+[8.218742] (-) TimerEvent: {}
+[8.319016] (-) TimerEvent: {}
+[8.419288] (-) TimerEvent: {}
+[8.519479] (-) TimerEvent: {}
+[8.619646] (-) TimerEvent: {}
+[8.719805] (-) TimerEvent: {}
+[8.819999] (-) TimerEvent: {}
+[8.920194] (-) TimerEvent: {}
+[8.926079] (station_detector_cpp) StdoutLine: {'line': b'[ 42%] Linking CXX executable ball_detector_node\n'}
+[9.020389] (-) TimerEvent: {}
+[9.120610] (-) TimerEvent: {}
+[9.220856] (-) TimerEvent: {}
+[9.321075] (-) TimerEvent: {}
+[9.421229] (-) TimerEvent: {}
+[9.521403] (-) TimerEvent: {}
+[9.621560] (-) TimerEvent: {}
+[9.693307] (station_detector_cpp) StdoutLine: {'line': b'[100%] Built target ball_detector_node\n'}
+[9.701720] (station_detector_cpp) CommandEnded: {'returncode': 0}
+[9.702106] (station_detector_cpp) JobProgress: {'identifier': 'station_detector_cpp', 'progress': 'install'}
+[9.712261] (station_detector_cpp) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/song/volleyball_detection/build/station_detector_cpp'], 'cwd': '/home/song/volleyball_detection/build/station_detector_cpp', 'env': OrderedDict([('GJS_DEBUG_TOPICS', 'JS ERROR;JS LOG'), ('LESSOPEN', '| /usr/bin/lesspipe %s'), ('VSCODE_CWD', '/home/song'), ('CURSOR_EXTENSION_HOST_ROLE', 'agent-exec'), ('VSCODE_ESM_ENTRYPOINT', 'vs/workbench/api/node/extensionHostProcess'), ('LANGUAGE', 'en_US:en'), ('USER', 'song'), ('LC_TIME', 'zh_CN.UTF-8'), ('VSCODE_NLS_CONFIG', '{"userLocale":"en-us","osLocale":"en-us","resolvedLanguage":"en","defaultMessagesFile":"/usr/share/cursor/resources/app/out/nls.messages.json","locale":"en-us","availableLanguages":{}}'), ('CI', '1'), ('VSCODE_HANDLES_UNCAUGHT_ERRORS', 'true'), ('XDG_SESSION_TYPE', 'wayland'), ('SHLVL', '1'), ('LD_LIBRARY_PATH', '/usr/local/lib:/usr/local/lib:/usr/local/lib:/home/song/cv_bridge_ws/install/cv_bridge/lib:/usr/lib/x86_64-linux-gnu/gazebo-11/plugins:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib:/usr/local/lib:/usr/local/lib:'), ('HOME', '/home/song'), ('CHROME_DESKTOP', 'cursor.desktop'), ('OLDPWD', '/home/song/volleyball_detection'), ('DESKTOP_SESSION', 'ubuntu'), ('VSCODE_IPC_HOOK', '/run/user/1000/vscode-8dcdf1b3-2.6.-main.sock'), ('GIO_LAUNCHED_DESKTOP_FILE', '/usr/share/applications/cursor.desktop'), ('GAZEBO_MASTER_URI', 'http://localhost:11345'), ('ROS_PYTHON_VERSION', '3'), ('GNOME_SHELL_SESSION_MODE', 'ubuntu'), ('GTK_MODULES', 'gail:atk-bridge'), ('LC_MONETARY', 'zh_CN.UTF-8'), ('CURSOR_WORKSPACE_LABEL', 'volleyball_detection'), ('MANAGERPID', '1734'), ('SYSTEMD_EXEC_PID', '1903'), ('IM_CONFIG_CHECK_ENV', '1'), ('NO_COLOR', '1'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('GIO_LAUNCHED_DESKTOP_FILE_PID', '3261'), ('VSCODE_CRASH_REPORTER_PROCESS_TYPE', 'extensionHost'), ('IM_CONFIG_PHASE', '1'), ('WAYLAND_DISPLAY', 'wayland-0'), ('COLCON_PREFIX_PATH', '/home/song/cv_bridge_ws/install'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'song'), ('FORCE_COLOR', '0'), ('JOURNAL_STREAM', '8:12809'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('PKG_CONFIG_PATH', '/usr/local/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/local/lib/pkgconfig:'), ('XDG_SESSION_CLASS', 'user'), ('USERNAME', 'song'), ('TERM', 'dumb'), ('GAZEBO_MODEL_PATH', '/usr/share/gazebo-11/models:/home/song/.gazebo/models'), ('GNOME_DESKTOP_SESSION_ID', 'this-is-deprecated'), ('FC_FONTATIONS', '1'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/home/song/.local/bin:/home/song/.local/bin:/opt/ros/humble/bin:/home/song/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'), ('SESSION_MANAGER', 'local/JSong:@/tmp/.ICE-unix/1878,unix/JSong:/tmp/.ICE-unix/1878'), ('INVOCATION_ID', 'ae99d94a2a2b4ab2879df1168288cf9e'), ('PAPERSIZE', 'a4'), ('XDG_MENU_PREFIX', 'gnome-'), ('LC_ADDRESS', 'zh_CN.UTF-8'), ('VSCODE_PROCESS_TITLE', 'extension-host (agent-exec) volleyball_detection [1-3]'), ('GNOME_SETUP_DISPLAY', ':1'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('GDK_BACKEND', 'wayland'), ('CURSOR_AGENT', '1'), ('DISPLAY', ':0'), ('LANG', 'en_US.UTF-8'), ('XDG_CURRENT_DESKTOP', 'ubuntu:GNOME'), ('LC_TELEPHONE', 'zh_CN.UTF-8'), ('XMODIFIERS', '@im=ibus'), ('XDG_SESSION_DESKTOP', 'ubuntu'), ('XAUTHORITY', '/run/user/1000/.mutter-Xwaylandauth.XWK8L3'), ('LS_COLORS', ''), ('CURSOR_TRACE_ID', '3d88cd416b244f418a64a93a083dd528'), ('SSH_AGENT_LAUNCHER', 'gnome-keyring'), ('SSH_AUTH_SOCK', '/run/user/1000/keyring/ssh'), ('AMENT_PREFIX_PATH', '/home/song/cv_bridge_ws/install/cv_bridge:/opt/ros/humble'), ('SHELL', '/bin/bash'), ('LC_NAME', 'zh_CN.UTF-8'), ('QT_ACCESSIBILITY', '1'), ('GDMSESSION', 'ubuntu'), ('LESSCLOSE', '/usr/bin/lesspipe %s %s'), ('LC_MEASUREMENT', 'zh_CN.UTF-8'), ('GAZEBO_RESOURCE_PATH', '/usr/share/gazebo-11:/usr/share/gazebo-11:'), ('GJS_DEBUG_OUTPUT', 'stderr'), ('OpenCV_DIR', '/usr/local'), ('LC_IDENTIFICATION', 'zh_CN.UTF-8'), ('QT_IM_MODULE', 'ibus'), ('PWD', '/home/song/volleyball_detection/build/station_detector_cpp'), ('LC_ALL', 'en_US.UTF-8'), ('XDG_CONFIG_DIRS', '/etc/xdg/xdg-ubuntu:/etc/xdg'), ('VSCODE_CODE_CACHE_PATH', '/home/song/.config/Cursor/CachedData/b29eb4ee5f9f6d1cb2afbc09070198d3ea6ad760'), ('XDG_DATA_DIRS', '/usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop'), ('PYTHONPATH', '/home/song/cv_bridge_ws/install/cv_bridge/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('LC_NUMERIC', 'zh_CN.UTF-8'), ('LC_PAPER', 'zh_CN.UTF-8'), ('COLCON', '1'), ('_ZO_DOCTOR', '0'), ('CMAKE_PREFIX_PATH', '/home/song/cv_bridge_ws/install/cv_bridge:/opt/ros/humble'), ('VSCODE_PID', '3261')]), 'shell': False}
+[9.718163] (station_detector_cpp) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[9.718388] (station_detector_cpp) StdoutLine: {'line': b'-- Execute custom install script\n'}
+[9.718505] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/lib/station_detector_cpp/ball_detector_node\n'}
+[9.718701] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/ball_position_estimator.hpp\n'}
+[9.718801] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/ball_tracker.hpp\n'}
+[9.718855] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/detection_filter.hpp\n'}
+[9.718930] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/trajectory_predictor.hpp\n'}
+[9.719006] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/include/yolo_inference.hpp\n'}
+[9.719081] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/ball_detector_params.yaml\n'}
+[9.719135] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/package_run_dependencies/station_detector_cpp\n'}
+[9.719192] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/parent_prefix_path/station_detector_cpp\n'}
+[9.719428] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/ament_prefix_path.sh\n'}
+[9.719531] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/ament_prefix_path.dsv\n'}
+[9.719604] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/path.sh\n'}
+[9.719666] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/path.dsv\n'}
+[9.719718] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.bash\n'}
+[9.719769] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.sh\n'}
+[9.719821] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.zsh\n'}
+[9.719872] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/local_setup.dsv\n'}
+[9.719925] (station_detector_cpp) StdoutLine: {'line': b'-- Symlinking: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/package.dsv\n'}
+[9.721618] (-) TimerEvent: {}
+[9.725216] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/packages/station_detector_cpp\n'}
+[9.725305] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/cmake/station_detector_cppConfig.cmake\n'}
+[9.725365] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/cmake/station_detector_cppConfig-version.cmake\n'}
+[9.725423] (station_detector_cpp) StdoutLine: {'line': b'-- Up-to-date symlink: /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/package.xml\n'}
+[9.726117] (station_detector_cpp) CommandEnded: {'returncode': 0}
+[9.748494] (station_detector_cpp) JobEnded: {'identifier': 'station_detector_cpp', 'rc': 0}
+[9.749477] (-) EventReactorShutdown: {}
