@@ -1,0 +1,28 @@
+## ROS2/colcon build outputs
+build/
+install/
+log/
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+## VSCode/Cursor
+.vscode/
+.cursor/
+
+## OS / misc
+.DS_Store
+Thumbs.db
+
+## Models / large artifacts (keep configs, don't commit weights)
+*.onnx
+*.pt
+*.engine
+models/
+# keep model directories, ignore the weights inside via patterns above
+
+## Runtime debug outputs
+debug_images/

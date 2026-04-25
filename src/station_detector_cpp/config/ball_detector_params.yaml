@@ -1,8 +1,9 @@
 ball_detector_node:
   ros__parameters:
     yolo:
-      # 注意：建议使用绝对路径。如果报错找不到模型，请改为 /home/你的用户名/volleyball_detection/src/station_detector_cpp/model/best.onnx
-      model_path: "/home/song/volleyball_detection/src/station_detector_cpp/model/best.onnx"
+      # 这里给一个“默认占位路径”。实际运行时建议通过 launch 或命令行覆盖：
+      # ros2 launch station_detector_cpp yolo_cpp_video.launch.py model_path:=/abs/path/to/best.onnx
+      model_path: "model/best.onnx"
       model_type: "yolov8"
       conf_threshold: 0.05
       iou_threshold: 0.45

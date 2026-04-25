@@ -71,5 +71,11 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Launch files (ROS2 launch)
+install(
+  DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}
+)
+
 # ---- ament 包 ----
 ament_package()

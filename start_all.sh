@@ -1,34 +1,28 @@
 #!/bin/bash
+set -euo pipefail
 
-# ==========================================
-# 配置区
-# ==========================================
-WS_PATH="$HOME/volleyball_detection"
-VIDEO_PATH="$WS_PATH/src/station_detector_cpp/videos/1.mp4"
-MODEL_PATH="$WS_PATH/src/station_detector_cpp/model/best.onnx"
-YAML_PATH="$WS_PATH/src/station_detector_cpp/config/ball_detector_params.yaml"
+# This repo is a ROS2 workspace. We resolve paths relative to this file,
+# so the script no longer depends on $HOME/volleyball_detection.
+WS_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 source /opt/ros/humble/setup.bash
-cd $WS_PATH
+cd "$WS_PATH"
 source install/setup.bash
 
-echo "正在启动系统..."
+echo "正在启动系统（C++ YOLO / 视频模式）..."
 
-# 1. 静态 TF
-gnome-terminal --tab --title="TF_Static" -- bash -c "ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 1 --yaw 0 --pitch 0 --roll 0 --frame-id odom --child-frame-id camera_optical_frame; exec bash"
+# Defaults (can be overridden by env vars)
+VIDEO_PATH="${VIDEO_PATH:-$WS_PATH/src/station_detector/videos/test.mp4}"
+MODEL_PATH="${MODEL_PATH:-$WS_PATH/src/station_detector_cpp/model/best.onnx}"
+PARAMS_FILE="${PARAMS_FILE:-$WS_PATH/src/station_detector_cpp/config/ball_detector_params.yaml}"
 
-# 2. 视频发布 (Python 直接跑)
-gnome-terminal --tab --title="Video_Pub" -- bash -c "python3 $WS_PATH/src/station_detector/scripts/video_publisher.py --ros-args -p video_path:=$VIDEO_PATH -p loop:=true; exec bash"
+LAUNCH_CMD="ros2 launch station_detector_cpp yolo_cpp_video.launch.py video_path:=$VIDEO_PATH model_path:=$MODEL_PATH params_file:=$PARAMS_FILE"
 
-# 3. 大脑节点 (修正了参数传递方式)
-# 注意：我们这里不传空数组了，直接传一个['ball']，或者依靠你 YAML 里的设置
-gnome-terminal --tab --title="Brain_Node" -- bash -c "source $WS_PATH/install/setup.bash; \
-ros2 run station_detector_cpp ball_detector_node --ros-args \
---params-file $YAML_PATH \
--p yolo.model_path:=$MODEL_PATH \
--p world_frame_id:=odom \
--p camera_frame_id:=camera_optical_frame; \
-exec bash"
-
-# 4. RViz2
-gnome-terminal --tab --title="RViz2" -- bash -c "rviz2; exec bash"
+if command -v gnome-terminal >/dev/null 2>&1; then
+  gnome-terminal --tab --title="YOLO_CPP_System" -- bash -c "$LAUNCH_CMD; exec bash"
+  gnome-terminal --tab --title="RViz2" -- bash -c "rviz2; exec bash"
+else
+  echo "未检测到 gnome-terminal，改为前台启动（需要多终端请用 tmux/另开终端）。"
+  echo "Launch: $LAUNCH_CMD"
+  bash -c "$LAUNCH_CMD"
+fi
