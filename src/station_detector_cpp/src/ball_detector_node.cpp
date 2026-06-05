@@ -22,6 +22,7 @@
 #include <vector>
 #include <optional>
 #include <algorithm>
+#include <cmath>
 
 #include "yolo_inference.hpp"
 #include "ball_tracker.hpp"
@@ -59,6 +60,18 @@ public:
         declare_parameter<bool>("detection.use_tracker", true);
         declare_parameter<double>("detection.h_ema_alpha", 0.3);
         declare_parameter<double>("detection.max_physical_speed", 25.0);
+        declare_parameter<bool>("detection.emergency_bypass", false);
+
+        declare_parameter<std::string>("input.image_topic", "/image_raw");
+        declare_parameter<std::string>("input.camera_info_topic", "/camera_info");
+
+        declare_parameter<std::string>("position.mode", "bbox");  // bbox | depth
+        declare_parameter<std::string>("position.depth_topic",
+                                      "/camera/aligned_depth_to_color/image_raw");
+        declare_parameter<double>("position.depth_max_stamp_delta_sec", 0.05);
+        declare_parameter<double>("position.depth_min_m", 0.3);
+        declare_parameter<double>("position.depth_max_m", 8.0);
+        declare_parameter<int>("position.depth_patch_radius", 2);
 
         declare_parameter<double>("trajectory.prediction_time", 0.5);
         declare_parameter<int>("trajectory.num_points", 10);
@@ -124,17 +137,39 @@ public:
             gravity, air_density, drag_coefficient, diameter, mass_kg,
             integration_dt, max_time, ground_z);
 
+        position_mode_ = toLower(get_parameter("position.mode").as_string());
+        if (position_mode_ != "bbox" && position_mode_ != "depth") {
+            RCLCPP_WARN(get_logger(),
+                        "Unknown position.mode='%s', fallback to 'bbox'",
+                        position_mode_.c_str());
+            position_mode_ = "bbox";
+        }
+
+        const auto image_topic = get_parameter("input.image_topic").as_string();
+        const auto camera_info_topic = get_parameter("input.camera_info_topic").as_string();
+
         // QoS：实时性优先
         rclcpp::QoS qos(rclcpp::KeepLast(1));
         qos.best_effort();
 
         image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-            "/image_raw", qos,
+            image_topic, qos,
             std::bind(&BallDetectorNode::imageCallback, this, _1));
 
         camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-            "/camera_info", 10,
+            camera_info_topic, 10,
             std::bind(&BallDetectorNode::cameraInfoCallback, this, _1));
+
+        if (position_mode_ == "depth") {
+            const auto depth_topic = get_parameter("position.depth_topic").as_string();
+            depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
+                depth_topic, qos,
+                std::bind(&BallDetectorNode::depthCallback, this, _1));
+            RCLCPP_INFO(get_logger(),
+                        "Position mode=depth, subscribed to %s", depth_topic.c_str());
+        } else {
+            RCLCPP_INFO(get_logger(), "Position mode=bbox (2D box height -> depth)");
+        }
 
         pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
             "/volleyball_pose", 10);
@@ -150,7 +185,7 @@ public:
         ball_prediction_pub_ = create_publisher<geometry_msgs::msg::Point>(
             "/ball_prediction", 10);
 
-        last_frame_time_ = now();
+        last_frame_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
         last_detection_time_valid_ = false;
         RCLCPP_INFO(get_logger(), "BallDetectorNode started.");
     }
@@ -268,6 +303,128 @@ private:
         return false;
     }
 
+    void depthCallback(const sensor_msgs::msg::Image::SharedPtr msg)
+    {
+        cv_bridge::CvImagePtr cv_ptr;
+        try {
+            if (msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
+                cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_16UC1);
+            } else if (msg->encoding == sensor_msgs::image_encodings::TYPE_32FC1) {
+                cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_32FC1);
+            } else {
+                cv_ptr = cv_bridge::toCvCopy(msg);
+            }
+        } catch (const cv_bridge::Exception& e) {
+            RCLCPP_WARN(get_logger(), "depth cv_bridge exception: %s", e.what());
+            return;
+        }
+
+        latest_depth_ = cv_ptr->image.clone();
+        latest_depth_encoding_ = msg->encoding;
+        latest_depth_stamp_ = rclcpp::Time(msg->header.stamp);
+        has_latest_depth_ = !latest_depth_.empty();
+    }
+
+    std::optional<double> sampleDepthMeters(int u, int v,
+                                            const rclcpp::Time& color_stamp) const
+    {
+        if (!has_latest_depth_ || latest_depth_.empty()) {
+            return std::nullopt;
+        }
+
+        const double max_delta =
+            get_parameter("position.depth_max_stamp_delta_sec").as_double();
+        const double stamp_delta =
+            std::abs((color_stamp - latest_depth_stamp_).seconds());
+        if (stamp_delta > max_delta) {
+            RCLCPP_WARN_THROTTLE(
+                get_logger(), *get_clock(), 2000,
+                "Depth/RGB stamp delta %.3fs > %.3fs, skip depth sample",
+                stamp_delta, max_delta);
+            return std::nullopt;
+        }
+
+        const int radius = std::max(0, get_parameter("position.depth_patch_radius").as_int());
+        const int h = latest_depth_.rows;
+        const int w = latest_depth_.cols;
+        if (u < 0 || v < 0 || u >= w || v >= h) {
+            return std::nullopt;
+        }
+
+        std::vector<double> samples;
+        samples.reserve(static_cast<size_t>((2 * radius + 1) * (2 * radius + 1)));
+
+        for (int dy = -radius; dy <= radius; ++dy) {
+            for (int dx = -radius; dx <= radius; ++dx) {
+                const int x = std::clamp(u + dx, 0, w - 1);
+                const int y = std::clamp(v + dy, 0, h - 1);
+                double depth_m = 0.0;
+                if (latest_depth_encoding_ == sensor_msgs::image_encodings::TYPE_16UC1) {
+                    const uint16_t raw = latest_depth_.at<uint16_t>(y, x);
+                    if (raw == 0) {
+                        continue;
+                    }
+                    depth_m = static_cast<double>(raw) * 0.001;  // mm -> m
+                } else if (latest_depth_encoding_ == sensor_msgs::image_encodings::TYPE_32FC1) {
+                    const float raw = latest_depth_.at<float>(y, x);
+                    if (!(raw > 0.0f) || !std::isfinite(raw)) {
+                        continue;
+                    }
+                    depth_m = static_cast<double>(raw);
+                } else {
+                    return std::nullopt;
+                }
+                samples.push_back(depth_m);
+            }
+        }
+
+        if (samples.empty()) {
+            return std::nullopt;
+        }
+
+        const size_t mid = samples.size() / 2;
+        std::nth_element(samples.begin(), samples.begin() + static_cast<long>(mid), samples.end());
+        const double depth_m = samples[mid];
+
+        const double min_depth = get_parameter("position.depth_min_m").as_double();
+        const double max_depth = get_parameter("position.depth_max_m").as_double();
+        if (depth_m < min_depth || depth_m > max_depth) {
+            return std::nullopt;
+        }
+        return depth_m;
+    }
+
+    std::optional<Eigen::Vector3d> estimatePositionCamera(
+        float cx, float cy, float /*bbox_height*/,
+        const rclcpp::Time& color_stamp) const
+    {
+        if (!camera_info_received_ || !position_estimator_) {
+            return std::nullopt;
+        }
+
+        Eigen::Vector3d pos_cam;
+        if (position_mode_ == "depth") {
+            const int u = static_cast<int>(std::lround(cx));
+            const int v = static_cast<int>(std::lround(cy));
+            const auto depth_m = sampleDepthMeters(u, v, color_stamp);
+            if (!depth_m.has_value()) {
+                return std::nullopt;
+            }
+            if (!position_estimator_->estimateFromDepth(cx, cy, depth_m.value(), pos_cam)) {
+                return std::nullopt;
+            }
+        } else {
+            const double h_smooth = getSmoothedBboxHeight();
+            if (h_smooth <= 0.0) {
+                return std::nullopt;
+            }
+            if (!position_estimator_->estimate(cx, cy, h_smooth, pos_cam)) {
+                return std::nullopt;
+            }
+        }
+        return pos_cam;
+    }
+
     void imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
     {
         // 每帧开始清空“当帧检测状态”，避免复用上一帧检测
@@ -290,9 +447,15 @@ private:
             return;
         }
 
-        const auto now_time = this->now();
-        double timestamp_sec = now_time.seconds();
-        const double frame_dt = (now_time - last_frame_time_).seconds();
+        const rclcpp::Time frame_time =
+            (msg->header.stamp.sec == 0 && msg->header.stamp.nanosec == 0)
+                ? this->now()
+                : rclcpp::Time(msg->header.stamp);
+        double timestamp_sec = frame_time.seconds();
+        double frame_dt = 0.0;
+        if (last_frame_time_.nanoseconds() > 0) {
+            frame_dt = (frame_time - last_frame_time_).seconds();
+        }
 
         // 1) YOLO 检测
         std::vector<Detection> detections;
@@ -302,63 +465,92 @@ private:
             RCLCPP_ERROR(get_logger(), "YOLO detect failed: %s", e.what());
             detections.clear();
         }
-        {
-            int raw_cnt = 0;
+        RCLCPP_DEBUG(get_logger(), "[YOLO RAW] %zu detections after conf filter", detections.size());
+
+        const bool emergency_bypass =
+            get_parameter("detection.emergency_bypass").as_bool();
+        const double min_confidence =
+            get_parameter("detection.min_confidence").as_double();
+
+        // 2) 类别 / 置信度 / 跟踪过滤（默认开启；emergency_bypass=true 时跳过）
+        std::vector<Detection> volleyball_detections;
+        if (emergency_bypass) {
+            volleyball_detections = detections;
+        } else {
+            volleyball_detections.reserve(detections.size());
             for (const auto& d : detections) {
-                if (d.confidence > 0.1f) {
-                    ++raw_cnt;
+                if (!isVolleyballClass(d.class_id)) {
+                    continue;
                 }
+                if (d.confidence < static_cast<float>(min_confidence)) {
+                    continue;
+                }
+                volleyball_detections.push_back(d);
             }
-            RCLCPP_INFO(get_logger(), "[YOLO RAW] Detected %d boxes with conf > 0.1", raw_cnt);
         }
 
-        // 2) EMERGENCY BYPASS: 禁用所有内部过滤链，YOLO 有框即认为找到球
-        std::vector<Detection> volleyball_detections = detections;
-        std::vector<Detection> filtered = detections;
-
-        // 3) 选择最佳检测（仅按置信度，不做距离/速度/大小等检查）
+        // 3) 选择最佳检测
         bool has_best = false;
         Detection best_det{};
-        if (!filtered.empty()) {
-            has_best = yolo_detector_->selectBestDetection(filtered, "confidence", best_det);
-            ball_found = has_best;
+        if (!volleyball_detections.empty()) {
+            if (!emergency_bypass && multi_tracker_) {
+                std::vector<cv::Point2f> centers;
+                centers.reserve(volleyball_detections.size());
+                for (const auto& d : volleyball_detections) {
+                    centers.emplace_back(d.x + d.width * 0.5f, d.y + d.height * 0.5f);
+                }
+                const int best_idx = multi_tracker_->update(centers);
+                if (best_idx >= 0 &&
+                    best_idx < static_cast<int>(volleyball_detections.size())) {
+                    best_det = volleyball_detections[static_cast<size_t>(best_idx)];
+                    has_best = true;
+                    ball_found = true;
+                }
+            } else {
+                has_best = yolo_detector_->selectBestDetection(
+                    volleyball_detections, "confidence", best_det);
+                ball_found = has_best;
+            }
         } else {
-            fresh_det_block_reason = "No YOLO box after detect()";
+            fresh_det_block_reason = "No detection after filter";
         }
 
-        // 5) 验证检测 -> 估计相机 3D -> TF 到 world（对齐：YOLO -> Estimator -> TF -> KF）
+        if (has_best && !emergency_bypass && detection_filter_) {
+            const float cx = best_det.x + best_det.width * 0.5f;
+            const float cy = best_det.y + best_det.height * 0.5f;
+            if (!detection_filter_->validate(cx, cy, best_det.confidence,
+                                             frame.cols, frame.rows)) {
+                has_best = false;
+                ball_found = false;
+                fresh_det_block_reason = "DetectionFilter rejected";
+            }
+        }
+
+        // 4) 估计相机 3D -> TF 到 world
         std::optional<Eigen::Vector3d> measurement_world = std::nullopt;
         if (has_best) {
             float cx = best_det.x + best_det.width * 0.5f;
             float cy = best_det.y + best_det.height * 0.5f;
             frame_raw_bbox_height = static_cast<double>(best_det.height);
-            frame_has_fresh_detection = true;
-            RCLCPP_INFO(get_logger(), "Raw bbox.height: %.3f", frame_raw_bbox_height);
             const double h_ema_alpha = get_parameter("detection.h_ema_alpha").as_double();
             updateBboxHeightEma(static_cast<double>(best_det.height), h_ema_alpha);
 
-            if (camera_info_received_ && position_estimator_) {
-                Eigen::Vector3d pos_cam;
-                    if (position_estimator_->estimate(cx, cy, getSmoothedBboxHeight(), pos_cam)) {
-                    // EMERGENCY BYPASS: 禁用深度范围过滤，直接走 TF
-                    std::optional<Eigen::Vector3d> pos_world =
-                        transformCameraToWorld(pos_cam, msg->header, now_time);
-                    if (pos_world.has_value()) {
-                        measurement_world = pos_world.value();
-                    } else {
-                        fresh_det_block_reason = "TF transform failed";
-                    }
+            const auto pos_cam_opt = estimatePositionCamera(cx, cy, best_det.height, frame_time);
+            if (pos_cam_opt.has_value()) {
+                std::optional<Eigen::Vector3d> pos_world =
+                    transformCameraToWorld(pos_cam_opt.value(), msg->header, frame_time);
+                if (pos_world.has_value()) {
+                    measurement_world = pos_world.value();
+                    frame_has_fresh_detection = true;
+                    last_detection_time_valid_ = true;
+                    last_detection_time_ = frame_time;
                 } else {
-                    fresh_det_block_reason = "position_estimator->estimate failed";
+                    fresh_det_block_reason = "TF transform failed";
                 }
             } else {
-                fresh_det_block_reason = "camera_info/position_estimator not ready";
-            }
-
-            if (measurement_world.has_value()) {
-                frame_has_fresh_detection = true;
-                last_detection_time_valid_ = true;
-                last_detection_time_ = now_time;
+                fresh_det_block_reason =
+                    (position_mode_ == "depth") ? "depth sample/estimate failed"
+                                               : "bbox depth estimate failed";
             }
         }
 
@@ -390,9 +582,9 @@ private:
                 fresh_det_block_reason.c_str());
         }
         bool valid_track = ball_tracker_->isInitialized();
-        RCLCPP_INFO(get_logger(), "Frame dt: %.4f, KF dt: %.4f, fresh_det: %s",
-                    frame_dt, static_cast<double>(ball_tracker_->getDt()),
-                    frame_has_fresh_detection ? "true" : "false");
+        RCLCPP_DEBUG(get_logger(), "Frame dt: %.4f, KF dt: %.4f, fresh_det: %s",
+                     frame_dt, static_cast<double>(ball_tracker_->getDt()),
+                     frame_has_fresh_detection ? "true" : "false");
 
         // 8) 发布 world pose + KF 状态，并进行世界系轨迹预测/可视化
         if (valid_track) {
@@ -402,8 +594,8 @@ private:
                 get_logger(), *this->get_clock(), 500,
                 "Tracking Ball at [%.3f, %.3f, %.3f]",
                 pos_world.x(), pos_world.y(), pos_world.z());
-            RCLCPP_INFO(
-                get_logger(),
+            RCLCPP_INFO_THROTTLE(
+                get_logger(), *this->get_clock(), 500,
                 "Velocity: Vx=%.2f, Vy=%.2f, Vz=%.2f",
                 vel_world.x(), vel_world.y(), vel_world.z());
 
@@ -430,10 +622,10 @@ private:
         if (get_parameter("debug.enable").as_bool()) {
             publishDebugImage(msg->header, frame, volleyball_detections,
                               has_best ? &best_det : nullptr,
-                              now_time);
+                              frame_time);
         }
 
-        last_frame_time_ = now_time;
+        last_frame_time_ = frame_time;
     }
 
     std::optional<Eigen::Vector3d> transformCameraToWorld(
@@ -653,14 +845,21 @@ private:
         }
 
         // Bright green system status
+        const char* mode_label =
+            (position_mode_ == "depth") ? "MODE: RGB-D" : "MODE: RGB/BBOX";
+        cv::putText(debug_img,
+                    mode_label,
+                    cv::Point(10, 30),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.7,
+                    cv::Scalar(0, 255, 0), 2);
         cv::putText(debug_img,
                     "SYSTEM ACTIVE",
-                    cv::Point(10, 30),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.9,
+                    cv::Point(10, 55),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.7,
                     cv::Scalar(0, 255, 0), 2);
 
         // 绘制状态信息（对齐 Python）
-        int info_y = 20;
+        int info_y = 80;
         cv::putText(debug_img,
                     "Detections: " + std::to_string(detections.size()),
                     cv::Point(10, info_y),
@@ -733,6 +932,7 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr traj_pub_;
@@ -751,6 +951,12 @@ private:
     bool has_bbox_height_ema_{false};
     Eigen::Vector3d last_measurement_world_{0.0, 0.0, 0.0};
     bool has_last_measurement_world_{false};
+
+    std::string position_mode_{"bbox"};
+    cv::Mat latest_depth_;
+    std::string latest_depth_encoding_;
+    rclcpp::Time latest_depth_stamp_{0, 0, RCL_ROS_TIME};
+    bool has_latest_depth_{false};
 };
 
 int main(int argc, char** argv)

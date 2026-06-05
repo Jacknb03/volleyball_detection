@@ -1,0 +1,332 @@
+# 部署与硬件加速指南
+
+本文档说明：**开发机（RTX 4060）验证 CUDA**、**传统 RGB 视频模式**、**RealSense D455i 深度模式** 三条路径。  
+代码默认 **`position.mode=bbox`（传统相机）**；深度相机装好驱动后切到 **`depth`** 即可，无需改 C++ 逻辑。
+
+---
+
+## 架构概览
+
+```
+                    ┌─────────────────────────────────────┐
+  传统 RGB 模式      │  YOLO(color) → bbox 估深 → TF → KF  │
+  position.mode=bbox │  视频 / MindVision / 普通 USB 相机   │
+                    └─────────────────────────────────────┘
+
+                    ┌─────────────────────────────────────┐
+  RGB-D 模式         │  YOLO(color) → 对齐 depth 采样 → TF │
+  position.mode=depth│  Intel RealSense D455i 等           │
+                    └─────────────────────────────────────┘
+                              ↓
+                    卡尔曼滤波 → 物理轨迹预测 → ROS 话题
+```
+
+两条路径 **共用同一套** `ball_detector_node`；仅 3D 测量来源不同。
+
+---
+
+## 〇、白话名词（不用背术语）
+
+### bbox 是什么？
+
+**bbox** = **b**ounding **box**，中文常说 **检测框**：YOLO 在画面上画的一个矩形，框住排球。
+
+你在 `/debug_image` 里看到的**绿色/黄色矩形**，就是 bbox。
+
+### bbox 模式（`position.mode=bbox`）是什么？
+
+**只有普通 RGB 相机（或视频）时**，相机本身测不到“有多远”，只能看到球在图像里有多大。
+
+bbox 模式的思路很直观：
+
+> **球在画面里看起来越大 → 说明离相机越近；越小 → 越远**
+
+程序用下面这些信息算 3D 位置：
+
+| 已知 | 从哪来 |
+|------|--------|
+| 框的中心在画面哪 | YOLO 检测框 |
+| 框有多高（像素） | YOLO 检测框 |
+| 排球真实直径（约 21 cm） | 配置文件里写死 |
+| 相机焦距 | `/camera_info` 内参 |
+
+对应代码里的公式（不用记，知道意思即可）：
+
+```
+深度 Z ≈ 焦距 × 球真实直径 ÷ 检测框高度
+```
+
+**优点**：任意 RGB 相机都能用，不用深度相机。  
+**缺点**：框抖一点，算出来的距离就抖；框不准，距离就不准。
+
+### depth 模式（`position.mode=depth`）是什么？
+
+有 **RealSense 等深度相机** 时：YOLO 仍然只负责**找到球在画面哪**，  
+但“有多远”不再靠框有多大猜，而是 **直接读深度图上的距离**。
+
+**优点**：3D 通常比 bbox 模式稳。  
+**缺点**：要多一路深度相机和驱动；快球、远距时深度可能有空洞。
+
+### 和 debug 画面上的字对应关系
+
+| 画面左上角 | 含义 |
+|------------|------|
+| `MODE: RGB/BBOX` | 普通相机，用检测框估距离 |
+| `MODE: RGB-D` | 深度相机，用深度图测距离 |
+
+---
+
+## 开发环境 vs 实战环境检查表
+
+上机器人 / 比赛前勾一遍（PC 上测通 ≠ 实战就绪）。
+
+### A. 软件与性能
+
+- [ ] 在 **Jetson（或最终小电脑）** 上 `colcon build` 通过
+- [ ] 实测处理间隔可接受（不是 PC 上的 fps，是板子上的）
+- [ ] `yolo.device` 在板子上真的在用 GPU（不是 silent 回退 CPU）
+- [ ] 下游节点能收到 `/volleyball_pose`、`/ball_prediction`
+
+### B. 相机与 3D
+
+- [ ] 确认用的是 **bbox** 还是 **depth** 模式，和实际硬件一致
+- [ ] **不是**视频假内参：实战用真实 `/camera_info` 或标定结果
+- [ ] depth 模式：`aligned_depth_to_color` 有数据，框中心能采到非 0 深度
+- [ ] 球在工作距离内（D455i 大致 0.6–6 m，视配置而定）
+
+### C. 坐标系（最容易漏）
+
+- [ ] 不再用占位 static TF（“相机在 odom 上方 1 m”那种）
+- [ ] `world_frame_id` 和队伍约定的场地/机器人坐标一致
+- [ ] 重力方向对：落点不会总往地下穿或往天上飞
+
+### D. 场景
+
+- [ ] 用 **接近比赛** 的环境测过（顶灯、背景人、球网）
+- [ ] 误检、丢检在可接受范围，KF 不会经常 reset
+- [ ] 和队友对齐：检测 10–15 Hz 够不够、落点误差容忍多少
+
+---
+
+## 一、开发机 RTX 4060：启用 GPU 推理
+
+### 1.1 现状
+
+- YOLO 使用 **OpenCV DNN + ONNX**（`yolo_inference.cpp`）
+- 参数 `yolo.device`：`auto` | `cpu` | `cuda`
+- **Ubuntu apt 自带的 OpenCV 通常不带 CUDA**，`auto` 会 silently 回退 CPU
+
+### 1.2 确认当前是否在 CPU 跑
+
+```bash
+colcon build --symlink-install --packages-select station_detector_cpp
+source install/setup.bash
+
+# 编译时看 CMake 输出：
+#   "OpenCV CUDA detected" → 可用 cuda
+#   "OpenCV CUDA not found" → 只能 CPU
+
+ros2 launch station_detector_cpp yolo_cpp_video.launch.py \
+  yolo_device:=cuda \
+  frame_rate:=15
+```
+
+终端若 `Frame dt` 经常 **> 0.1 s**，说明仍在 CPU 或模型过大。
+
+### 1.3 路径 A：OpenCV + CUDA（与现有代码最贴合）
+
+**4060 开发机**（需已装 NVIDIA 驱动 + CUDA Toolkit + cuDNN）：
+
+```bash
+# 1) 查 CUDA 版本
+nvidia-smi
+
+# 2) 从源码编译 OpenCV（示例，版本按本机 CUDA 调整）
+git clone --depth 1 -b 4.x https://github.com/opencv/opencv.git
+git clone --depth 1 -b 4.x https://github.com/opencv/opencv_contrib.git
+
+cd opencv && mkdir build && cd build
+cmake -D CMAKE_BUILD_TYPE=Release \
+  -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
+  -D WITH_CUDA=ON \
+  -D WITH_CUDNN=ON \
+  -D OPENCV_DNN_CUDA=ON \
+  -D ENABLE_FAST_MATH=ON \
+  -D CUDA_FAST_MATH=ON \
+  -D BUILD_EXAMPLES=OFF \
+  ..
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+
+# 3) 重新编译本包（CMake 会自动定义 HAVE_CUDA）
+cd ~/volleyball_detection
+colcon build --symlink-install --packages-select station_detector_cpp
+```
+
+运行：
+
+```bash
+ros2 launch station_detector_cpp yolo_cpp_video.launch.py yolo_device:=cuda
+```
+
+### 1.4 路径 B：Jetson 部署（推荐上机方案）
+
+| 步骤 | 说明 |
+|------|------|
+| 1 | 在 4060 上完成算法验证（bbox / depth 两模式） |
+| 2 | 代码 push 到 Jetson，`colcon build` |
+| 3 | JetPack 自带 CUDA OpenCV，设 `yolo.device:=cuda` |
+| 4 | **TensorRT**：ONNX → `.engine` 需在 **Jetson 本机** 生成，不能从 4060 拷贝 |
+| 5 | RealSense：`sudo apt install ros-humble-realsense2-camera` |
+
+Orin Nano 8G 经验目标：**YOLOv8n/s @640 + TensorRT → 20–30 fps**。
+
+### 1.5 4060 vs Jetson 注意
+
+- **TensorRT engine 不能跨设备共用**（SM 架构不同）
+- 4060 用于开发调试；**比赛机以 Jetson 实测 fps 为准**
+- IMU（D455i 内置）后续可接 `robot_localization`，第一版可忽略
+
+---
+
+## 二、传统 RGB 模式（当前默认）
+
+### 2.1 视频验证
+
+```bash
+source install/setup.bash
+
+ros2 launch station_detector_cpp yolo_cpp_video.launch.py \
+  video_path:=/abs/path/to/video.mp4 \
+  model_path:=/abs/path/to/best.onnx \
+  frame_rate:=15 \
+  yolo_device:=auto
+```
+
+关键参数（`config/ball_detector_params.yaml`）：
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `position.mode` | `bbox` | 传统：bbox 高度估深 |
+| `detection.emergency_bypass` | `false` | 恢复类别/跟踪/验证过滤链 |
+| `detection.min_consistent_detections` | `2` | 减少单帧误检 |
+| `yolo.device` | `auto` | 有 CUDA OpenCV 时用 GPU |
+
+### 2.2 观测
+
+```bash
+ros2 topic echo /volleyball_pose
+ros2 topic echo /ball_prediction
+# RViz / rqt_image_view 看 /debug_image（左上角 MODE: RGB/BBOX）
+```
+
+### 2.3 时间戳（已修复）
+
+KF 与速度门控现在使用 **`image header.stamp`**，不再用 `node->now()`。  
+视频/相机必须发布正确时间戳，否则 dt 会乱。
+
+---
+
+## 三、RealSense D455i 深度模式（驱动就绪后启用）
+
+### 3.1 安装驱动
+
+```bash
+sudo apt update
+sudo apt install ros-humble-realsense2-camera
+
+realsense-viewer   # 确认 D455i RGB/Depth/IMU 正常
+```
+
+### 3.2 启动（一键）
+
+```bash
+ros2 launch station_detector_cpp yolo_cpp_realsense.launch.py \
+  model_path:=/abs/path/to/best.onnx \
+  yolo_device:=cuda
+```
+
+Launch 会自动设置：
+
+| 参数 | RealSense 值 |
+|------|----------------|
+| `position.mode` | `depth` |
+| `input.image_topic` | `/camera/color/image_raw` |
+| `input.camera_info_topic` | `/camera/color/camera_info` |
+| `position.depth_topic` | `/camera/aligned_depth_to_color/image_raw` |
+| `camera_frame_id` | `camera_color_optical_frame` |
+
+### 3.3 手动切换（已有 realsense 节点在跑）
+
+```bash
+ros2 run station_detector_cpp ball_detector_node \
+  --ros-args \
+  --params-file src/station_detector_cpp/config/ball_detector_params.yaml \
+  -p yolo.model_path:=/abs/path/to/best.onnx \
+  -p position.mode:=depth \
+  -p input.image_topic:=/camera/color/image_raw \
+  -p input.camera_info_topic:=/camera/color/camera_info \
+  -p position.depth_topic:=/camera/aligned_depth_to_color/image_raw \
+  -p camera_frame_id:=camera_color_optical_frame
+```
+
+### 3.4 深度采样逻辑
+
+- 在 YOLO 框中心取 **对齐深度图** 像素
+- 支持 `16UC1`（RealSense 毫米）和 `32FC1`（米）
+- 小 patch **中值** 滤波（`position.depth_patch_radius`）
+- RGB/Depth 时间戳差 > `depth_max_stamp_delta_sec` 则丢弃该帧深度
+
+### 3.5 D455i 注意
+
+- 有效深度大约 **0.6–6 m**（视配置），排球高远球可能超量程
+- 快速运动深度可能有空洞 → KF 会 predict，属正常现象
+- **静态 TF 是占位**（相机 z=1 m）；上机器人后换成 URDF/标定外参
+- IMU 第一版未接入，后续可用于相机运动补偿
+
+---
+
+## 四、推荐工作流（平台未定阶段）
+
+```
+阶段 1  [现在]  4060 + 视频 + bbox 模式
+         → 确认 YOLO、KF、轨迹链路
+         → 尽量启用 CUDA，目标 Frame dt < 50 ms
+
+阶段 2  [借到 D455i]  realsense launch + depth 模式
+         → 对比 bbox vs depth 的 3D 抖动和落点误差
+
+阶段 3  [队友确认 Jetson]  板上 colcon build + TensorRT
+         → 定最终 fps 和模型大小
+
+阶段 4  [上机器人]  换真实 TF、标定、调 max_physical_speed
+```
+
+---
+
+## 五、常见问题
+
+**Q: 深度模式 debug 仍显示 Searching，但 YOLO 有框？**  
+A: 多为 depth 采样失败（未对齐、时间戳不同步、深度为 0）。查 `ros2 topic hz /camera/aligned_depth_to_color/image_raw`。
+
+**Q: Velocity gate 频繁触发？**  
+A: 增大 `detection.max_physical_speed`，或确认 `header.stamp` 正常；检测太稀疏时先提 fps。
+
+**Q: 想临时跳过所有过滤 debug YOLO？**  
+A: `-p detection.emergency_bypass:=true`（仅调试，不建议比赛用）。
+
+**Q: 4060 上 cuda 设了还是慢？**  
+A: 看编译日志是否有 `OpenCV CUDA detected`；没有则需按 §1.3 重编 OpenCV。
+
+---
+
+## 六、文件索引
+
+| 文件 | 作用 |
+|------|------|
+| `config/ball_detector_params.yaml` | 全部 ROS 参数 |
+| `launch/yolo_cpp_video.launch.py` | 视频 + bbox 模式 |
+| `launch/yolo_cpp_realsense.launch.py` | D455i + depth 模式 |
+| `src/ball_detector_node.cpp` | 双模式主节点 |
+| `include/ball_position_estimator.hpp` | bbox / depth 两种 3D 反投影 |

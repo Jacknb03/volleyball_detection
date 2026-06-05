@@ -79,6 +79,25 @@ public:
         return true;
     }
 
+    /**
+     * 通过 RGB 像素坐标 + 深度（米）反投影到相机坐标系。
+     * 适用于 RealSense 等 RGB-D 相机（depth 已与 color 对齐）。
+     */
+    bool estimateFromDepth(double u, double v,
+                           double depth_m,
+                           Eigen::Vector3d& out_position) const
+    {
+        if (!intrinsics_set_ || depth_m <= 0.0 || fx_ <= 0.0 || fy_ <= 0.0) {
+            return false;
+        }
+
+        const double Z = depth_m;
+        const double X = (u - cx_) * Z / fx_;
+        const double Y = (v - cy_) * Z / fy_;
+        out_position = Eigen::Vector3d(X, Y, Z);
+        return true;
+    }
+
 private:
     double fx_{0.0};
     double fy_{0.0};

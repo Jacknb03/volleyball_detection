@@ -26,7 +26,9 @@ def generate_launch_description():
     params_file_arg = DeclareLaunchArgument("params_file", default_value=default_params)
     video_path_arg = DeclareLaunchArgument("video_path", default_value=default_video)
     loop_arg = DeclareLaunchArgument("loop", default_value="true")
+    frame_rate_arg = DeclareLaunchArgument("frame_rate", default_value="15.0")
     model_path_arg = DeclareLaunchArgument("model_path", default_value=default_model)
+    yolo_device_arg = DeclareLaunchArgument("yolo_device", default_value="auto")
 
     static_tf = Node(
         package="tf2_ros",
@@ -62,6 +64,7 @@ def generate_launch_description():
             {
                 "video_path": LaunchConfiguration("video_path"),
                 "loop": LaunchConfiguration("loop"),
+                "frame_rate": LaunchConfiguration("frame_rate"),
             }
         ],
     )
@@ -77,6 +80,10 @@ def generate_launch_description():
             "--ros-args",
             "-p",
             ["yolo.model_path:=", LaunchConfiguration("model_path")],
+            "-p",
+            ["yolo.device:=", LaunchConfiguration("yolo_device")],
+            "-p",
+            "position.mode:=bbox",
         ],
     )
 
@@ -85,7 +92,9 @@ def generate_launch_description():
             params_file_arg,
             video_path_arg,
             loop_arg,
+            frame_rate_arg,
             model_path_arg,
+            yolo_device_arg,
             LogInfo(msg=["Starting C++ YOLO pipeline (video mode)..."]),
             static_tf,
             video_pub,

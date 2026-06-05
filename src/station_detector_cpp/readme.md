@@ -1,5 +1,8 @@
 本手册旨在帮助你通过修改 ball_detector_params.yaml 配置文件，优化排球拦截系统的准确性、稳定性和响应速度。
 
+> **硬件部署 / CUDA / RealSense D455i**：见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)  
+> **从零调试步骤**：见 [docs/DEBUGGING.md](docs/DEBUGGING.md)
+
 核心逻辑链路回顾
 
 YOLO (眼睛)：识别 2D 像素框。

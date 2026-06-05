@@ -1,16 +1,30 @@
 ball_detector_node:
   ros__parameters:
     yolo:
-      # 这里给一个“默认占位路径”。实际运行时建议通过 launch 或命令行覆盖：
-      # ros2 launch station_detector_cpp yolo_cpp_video.launch.py model_path:=/abs/path/to/best.onnx
+      # 实际运行时建议通过 launch 覆盖 model_path
       model_path: "model/best.onnx"
       model_type: "yolov8"
-      conf_threshold: 0.05
+      conf_threshold: 0.25
       iou_threshold: 0.45
+      # auto | cpu | cuda（cuda 需 OpenCV 编译时启用 CUDA，见 docs/DEPLOYMENT.md）
       device: "auto"
-      volleyball_classes: 
+      volleyball_classes:
         - "volleyball"
         - "Volleyball"
+
+    # 输入话题（RealSense 模式下在 launch 里 remap）
+    input:
+      image_topic: "/image_raw"
+      camera_info_topic: "/camera_info"
+
+    # 3D 位置模式：bbox=传统 RGB 估深；depth=RGB-D 对齐深度图
+    position:
+      mode: "bbox"
+      depth_topic: "/camera/aligned_depth_to_color/image_raw"
+      depth_max_stamp_delta_sec: 0.05
+      depth_min_m: 0.3
+      depth_max_m: 8.0
+      depth_patch_radius: 2
 
     kalman:
       process_noise: 0.05
@@ -20,13 +34,15 @@ ball_detector_node:
 
     detection:
       max_jump_distance: 100.0
-      min_consistent_detections: 1
+      min_consistent_detections: 2
       max_detections: 3
       selection_method: "confidence"
       min_confidence: 0.25
       use_tracker: true
       h_ema_alpha: 0.3
       max_physical_speed: 25.0
+      # false=正常过滤链；true=调试时跳过类别/跟踪/验证（不推荐长期使用）
+      emergency_bypass: false
 
     trajectory:
       prediction_time: 0.5
@@ -35,7 +51,6 @@ ball_detector_node:
       max_time: 5.0
       ground_z: 0.0
 
-    # 坐标系与物理参数
     world_frame_id: "odom"
     camera_frame_id: "camera_optical_frame"
     air_density: 1.225

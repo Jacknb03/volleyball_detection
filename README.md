@@ -75,6 +75,8 @@ volleyball_detection/
 
 - **模型路径**：建议始终通过 launch 参数覆盖 `model_path`，而不是在 YAML 里写死绝对路径。
 - **主参数文件**：`src/station_detector_cpp/config/ball_detector_params.yaml`
+- **调试步骤（推荐先看）**：`src/station_detector_cpp/docs/DEBUGGING.md`
+- **部署 / CUDA / RealSense**：`src/station_detector_cpp/docs/DEPLOYMENT.md`
 - **视频发布**：由 `station_detector/scripts/video_publisher.py` 提供（launch 已集成）
 
 `start_all.sh` 支持环境变量覆盖：

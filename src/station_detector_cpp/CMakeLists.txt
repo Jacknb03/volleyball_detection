@@ -56,6 +56,14 @@ target_link_libraries(ball_detector_node
   Eigen3::Eigen
 )
 
+# OpenCV 若带 CUDA，则启用 YOLO GPU 后端（yolo.device:=cuda）
+if(OpenCV_CUDA_VERSION)
+  target_compile_definitions(ball_detector_node PRIVATE HAVE_CUDA)
+  message(STATUS "OpenCV CUDA detected (${OpenCV_CUDA_VERSION}), YOLO GPU backend enabled")
+else()
+  message(STATUS "OpenCV CUDA not found; YOLO will use CPU unless ONNX Runtime is added later")
+endif()
+
 # ---- 安装 ----
 install(TARGETS ball_detector_node
   DESTINATION lib/${PROJECT_NAME}
