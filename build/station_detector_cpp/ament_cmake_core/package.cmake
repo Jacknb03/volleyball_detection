@@ -5,7 +5,7 @@ set(station_detector_cpp_BUILD_DEPENDS "rclcpp" "sensor_msgs" "geometry_msgs" "v
 set(station_detector_cpp_BUILDTOOL_DEPENDS "ament_cmake")
 set(station_detector_cpp_BUILD_EXPORT_DEPENDS "rclcpp" "sensor_msgs" "geometry_msgs" "visualization_msgs" "std_msgs" "cv_bridge" "image_transport" "OpenCV" "Eigen3")
 set(station_detector_cpp_BUILDTOOL_EXPORT_DEPENDS )
-set(station_detector_cpp_EXEC_DEPENDS "rclcpp" "sensor_msgs" "geometry_msgs" "visualization_msgs" "std_msgs" "cv_bridge" "image_transport" "tf2" "tf2_ros" "tf2_geometry_msgs")
+set(station_detector_cpp_EXEC_DEPENDS "rclcpp" "sensor_msgs" "geometry_msgs" "visualization_msgs" "std_msgs" "cv_bridge" "image_transport" "tf2" "tf2_ros" "tf2_geometry_msgs" "launch" "launch_ros")
 set(station_detector_cpp_TEST_DEPENDS )
 set(station_detector_cpp_GROUP_DEPENDS )
 set(station_detector_cpp_MEMBER_OF_GROUPS )

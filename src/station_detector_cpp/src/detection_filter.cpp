@@ -6,10 +6,12 @@
 
 DetectionFilter::DetectionFilter(float max_jump_distance,
                                  int   min_consistent_detections,
-                                 int   history_size)
+                                 int   history_size,
+                                 float min_confidence)
     : max_jump_distance_(max_jump_distance),
       min_consistent_detections_(min_consistent_detections),
       history_size_(history_size),
+      min_confidence_(min_confidence),
       consistent_count_(0),
       last_valid_center_(0.0f, 0.0f),
       has_last_valid_center_(false)
@@ -43,8 +45,7 @@ bool DetectionFilter::validate(float center_x,
         return false;
     }
 
-    // 3. 置信度下限（与 Python 固定 0.3 一致）
-    if (confidence < 0.3f) {
+    if (confidence < min_confidence_) {
         return false;
     }
 
@@ -57,8 +58,10 @@ bool DetectionFilter::validate(float center_x,
         float distance = std::sqrt(dx * dx + dy * dy);
 
         if (distance > max_jump_distance_) {
-            // 跳变过大，认为是误检，重置连续计数
+            // 场景切换（如视频循环）时允许重新锁定目标
             consistent_count_ = 0;
+            has_last_valid_center_ = false;
+            history_.clear();
             return false;
         }
     }

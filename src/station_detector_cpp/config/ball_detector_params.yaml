@@ -4,7 +4,7 @@ ball_detector_node:
       # 实际运行时建议通过 launch 覆盖 model_path
       model_path: "model/best.onnx"
       model_type: "yolov8"
-      conf_threshold: 0.25
+      conf_threshold: 0.18
       iou_threshold: 0.45
       # auto | cpu | cuda（cuda 需 OpenCV 编译时启用 CUDA，见 docs/DEPLOYMENT.md）
       device: "auto"
@@ -34,10 +34,10 @@ ball_detector_node:
 
     detection:
       max_jump_distance: 100.0
-      min_consistent_detections: 2
+      min_consistent_detections: 1
       max_detections: 3
       selection_method: "confidence"
-      min_confidence: 0.25
+      min_confidence: 0.18
       use_tracker: true
       h_ema_alpha: 0.3
       max_physical_speed: 25.0

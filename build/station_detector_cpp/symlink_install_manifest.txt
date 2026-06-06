@@ -4,7 +4,9 @@
 /home/song/volleyball_detection/install/station_detector_cpp/include/detection_filter.hpp
 /home/song/volleyball_detection/install/station_detector_cpp/include/trajectory_predictor.hpp
 /home/song/volleyball_detection/install/station_detector_cpp/include/yolo_inference.hpp
-/home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/ball_detector_params.yaml
+/home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/config/ball_detector_params.yaml
+/home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/yolo_cpp_realsense.launch.py
+/home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/yolo_cpp_video.launch.py
 /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/package_run_dependencies/station_detector_cpp
 /home/song/volleyball_detection/install/station_detector_cpp/share/ament_index/resource_index/parent_prefix_path/station_detector_cpp
 /home/song/volleyball_detection/install/station_detector_cpp/share/station_detector_cpp/environment/ament_prefix_path.sh

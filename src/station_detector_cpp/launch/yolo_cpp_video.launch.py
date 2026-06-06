@@ -12,6 +12,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -74,16 +75,17 @@ def generate_launch_description():
         executable="ball_detector_node",
         name="ball_detector_node",
         output="screen",
-        parameters=[LaunchConfiguration("params_file")],
-        # Override model path without editing YAML (portable).
-        arguments=[
-            "--ros-args",
-            "-p",
-            ["yolo.model_path:=", LaunchConfiguration("model_path")],
-            "-p",
-            ["yolo.device:=", LaunchConfiguration("yolo_device")],
-            "-p",
-            "position.mode:=bbox",
+        parameters=[
+            LaunchConfiguration("params_file"),
+            {
+                "yolo.model_path": ParameterValue(
+                    LaunchConfiguration("model_path"), value_type=str
+                ),
+                "yolo.device": ParameterValue(
+                    LaunchConfiguration("yolo_device"), value_type=str
+                ),
+                "position.mode": "bbox",
+            },
         ],
     )
 

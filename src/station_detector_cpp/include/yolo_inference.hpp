@@ -135,6 +135,7 @@ protected:
     // OpenCV DNN backend (ONNX inference). This is the concrete inference path
     // used to match the Python YOLODetector.detect() behavior at runtime.
     mutable bool net_initialized_{false};
+    mutable bool force_cpu_backend_{false};
     mutable cv::dnn::Net net_;
     mutable int num_classes_{80}; // default COCO-80
     mutable std::vector<std::string> class_names_;

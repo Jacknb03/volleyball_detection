@@ -23,9 +23,10 @@ public:
      * @param min_consistent_detections 最小连续有效检测次数
      * @param history_size             历史记录长度
      */
-    DetectionFilter(float max_jump_distance        = 100.0f,
+    DetectionFilter(float max_jump_distance         = 100.0f,
                     int   min_consistent_detections = 2,
-                    int   history_size              = 5);
+                    int   history_size              = 5,
+                    float min_confidence            = 0.3f);
 
     /**
      * 验证单个检测是否有效
@@ -65,6 +66,7 @@ private:
     float      max_jump_distance_;
     int        min_consistent_detections_;
     int        history_size_;
+    float      min_confidence_;
     std::deque<cv::Point2f> history_;
     int        consistent_count_;
     cv::Point2f last_valid_center_;

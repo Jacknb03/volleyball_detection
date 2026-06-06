@@ -56,12 +56,20 @@ target_link_libraries(ball_detector_node
   Eigen3::Eigen
 )
 
-# OpenCV 若带 CUDA，则启用 YOLO GPU 后端（yolo.device:=cuda）
+# YOLO device selection is runtime via cv::dnn::getAvailableBackends().
+set(_opencv_cuda_ok FALSE)
 if(OpenCV_CUDA_VERSION)
-  target_compile_definitions(ball_detector_node PRIVATE HAVE_CUDA)
-  message(STATUS "OpenCV CUDA detected (${OpenCV_CUDA_VERSION}), YOLO GPU backend enabled")
-else()
-  message(STATUS "OpenCV CUDA not found; YOLO will use CPU unless ONNX Runtime is added later")
+  set(_opencv_cuda_ok TRUE)
+  message(STATUS "OpenCV CUDA detected (${OpenCV_CUDA_VERSION})")
+elseif(OpenCV_DIR AND EXISTS "${OpenCV_DIR}/cvconfig.h")
+  file(READ "${OpenCV_DIR}/cvconfig.h" _cvconfig)
+  if(_cvconfig MATCHES "#define HAVE_CUDA")
+    set(_opencv_cuda_ok TRUE)
+    message(STATUS "OpenCV CUDA detected (cvconfig.h HAVE_CUDA)")
+  endif()
+endif()
+if(NOT _opencv_cuda_ok)
+  message(STATUS "OpenCV DNN CUDA not available; yolo.device:=cuda/auto will use CPU")
 endif()
 
 # ---- 安装 ----
@@ -76,13 +84,19 @@ install(
 
 install(
   DIRECTORY config/
-  DESTINATION share/${PROJECT_NAME}
+  DESTINATION share/${PROJECT_NAME}/config
 )
 
 # Launch files (ROS2 launch)
 install(
   DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY model/
+  DESTINATION share/${PROJECT_NAME}/model
+  FILES_MATCHING PATTERN "*.onnx"
 )
 
 # ---- ament 包 ----

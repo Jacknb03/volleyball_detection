@@ -230,8 +230,10 @@ private:
         int min_consistent =
             get_parameter("detection.min_consistent_detections").as_int();
 
+        const float min_confidence =
+            static_cast<float>(get_parameter("detection.min_confidence").as_double());
         detection_filter_ = std::make_unique<DetectionFilter>(
-            max_jump, min_consistent, 5);
+            max_jump, min_consistent, 5, min_confidence);
 
         bool use_tracker = get_parameter("detection.use_tracker").as_bool();
         if (use_tracker) {
@@ -326,7 +328,7 @@ private:
     }
 
     std::optional<double> sampleDepthMeters(int u, int v,
-                                            const rclcpp::Time& color_stamp) const
+                                            const rclcpp::Time& color_stamp)
     {
         if (!has_latest_depth_ || latest_depth_.empty()) {
             return std::nullopt;
@@ -344,7 +346,8 @@ private:
             return std::nullopt;
         }
 
-        const int radius = std::max(0, get_parameter("position.depth_patch_radius").as_int());
+        const int radius = std::max(
+            0, static_cast<int>(get_parameter("position.depth_patch_radius").as_int()));
         const int h = latest_depth_.rows;
         const int w = latest_depth_.cols;
         if (u < 0 || v < 0 || u >= w || v >= h) {
@@ -396,7 +399,7 @@ private:
 
     std::optional<Eigen::Vector3d> estimatePositionCamera(
         float cx, float cy, float /*bbox_height*/,
-        const rclcpp::Time& color_stamp) const
+        const rclcpp::Time& color_stamp)
     {
         if (!camera_info_received_ || !position_estimator_) {
             return std::nullopt;
@@ -563,14 +566,19 @@ private:
             if (v_temp.norm() > max_speed) {
                 RCLCPP_WARN(
                     get_logger(),
-                    "Velocity gate triggered: |v_temp|=%.3f > max_physical_speed=%.3f, use KF predict only",
+                    "Velocity gate triggered: |v_temp|=%.3f > max_physical_speed=%.3f, reset tracking",
                     v_temp.norm(), max_speed);
                 measurement_world = std::nullopt;
+                resetTrackingState("velocity gate (scene jump / video loop)");
             }
         }
 
         // 7) 卡尔曼滤波更新（含丢帧预测）
+        const bool kf_was_initialized = ball_tracker_->isInitialized();
         ball_tracker_->updateWithMissing(measurement_world, timestamp_sec);
+        if (!ball_tracker_->isInitialized() && kf_was_initialized) {
+            resetTrackingState("kalman lost track");
+        }
         if (measurement_world.has_value()) {
             last_measurement_world_ = measurement_world.value();
             has_last_measurement_world_ = true;
@@ -687,6 +695,22 @@ private:
             return 0.0;
         }
         return bbox_height_ema_;
+    }
+
+    void resetTrackingState(const char* reason)
+    {
+        RCLCPP_INFO(get_logger(), "Reset tracking state: %s", reason);
+        has_last_measurement_world_ = false;
+        has_bbox_height_ema_ = false;
+        if (detection_filter_) {
+            detection_filter_->reset();
+        }
+        if (multi_tracker_) {
+            multi_tracker_->reset();
+        }
+        if (ball_tracker_) {
+            ball_tracker_->reset();
+        }
     }
 
     void publishBallState(const Eigen::Vector3d& pos,

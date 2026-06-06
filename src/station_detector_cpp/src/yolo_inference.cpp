@@ -4,6 +4,46 @@
 #include <cmath>
 #include <numeric>
 
+namespace {
+
+bool dnnCudaAvailable()
+{
+    const auto backends = cv::dnn::getAvailableBackends();
+    for (const auto& backend : backends) {
+        if (backend.first == cv::dnn::DNN_BACKEND_CUDA &&
+            (backend.second == cv::dnn::DNN_TARGET_CUDA ||
+             backend.second == cv::dnn::DNN_TARGET_CUDA_FP16))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void applyCpuBackend(cv::dnn::Net& net)
+{
+    net.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+    net.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+}
+
+void applyCudaBackend(cv::dnn::Net& net)
+{
+    bool use_fp16 = false;
+    for (const auto& backend : cv::dnn::getAvailableBackends()) {
+        if (backend.first == cv::dnn::DNN_BACKEND_CUDA &&
+            backend.second == cv::dnn::DNN_TARGET_CUDA_FP16)
+        {
+            use_fp16 = true;
+            break;
+        }
+    }
+    net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    net.setPreferableTarget(use_fp16 ? cv::dnn::DNN_TARGET_CUDA_FP16
+                                     : cv::dnn::DNN_TARGET_CUDA);
+}
+
+}  // namespace
+
 YOLODetector::YOLODetector(const std::string& model_path,
                            const std::string& model_type,
                            float conf_threshold,
@@ -63,29 +103,17 @@ void YOLODetector::ensureNetInitialized() const
 
     net_ = cv::dnn::readNet(model_path_);
 
-    // Device selection (best-effort, consistent with Python 'auto' behavior)
+    // Device selection: probe OpenCV DNN at runtime (do not rely on compile-time HAVE_CUDA).
     std::string dev = device_;
     std::transform(dev.begin(), dev.end(), dev.begin(), ::tolower);
 
-    if (dev == "cuda") {
-#ifdef HAVE_CUDA
-        net_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-        net_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-#else
-        net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-        net_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-#endif
-    } else if (dev == "cpu") {
-        net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-        net_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-    } else { // auto
-#ifdef HAVE_CUDA
-        net_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-        net_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-#else
-        net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
-        net_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
-#endif
+    const bool want_cuda = (dev == "cuda" || dev == "auto");
+    const bool cuda_ok = dnnCudaAvailable();
+
+    if (force_cpu_backend_ || dev == "cpu" || !want_cuda || !cuda_ok) {
+        applyCpuBackend(net_);
+    } else {
+        applyCudaBackend(net_);
     }
 
     net_initialized_ = true;
@@ -271,7 +299,19 @@ void YOLODetector::runModel(const cv::Mat& image,
     net_.setInput(blob);
 
     std::vector<cv::Mat> outputs;
-    net_.forward(outputs, net_.getUnconnectedOutLayersNames());
+    try {
+        net_.forward(outputs, net_.getUnconnectedOutLayersNames());
+    } catch (const cv::Exception&) {
+        if (!force_cpu_backend_) {
+            force_cpu_backend_ = true;
+            net_initialized_ = false;
+            ensureNetInitialized();
+            net_.setInput(blob);
+            net_.forward(outputs, net_.getUnconnectedOutLayersNames());
+        } else {
+            throw;
+        }
+    }
     if (outputs.empty()) {
         return;
     }
