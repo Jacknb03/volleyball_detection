@@ -1,7 +1,7 @@
 # 调试指南（从零到跑通）
 
 面向：**先在 Ubuntu 上用视频把链路调通，再接 RealSense**。  
-参数调优见 [readme.md](../readme.md)；CUDA / Jetson / RealSense 见 [DEPLOYMENT.md](DEPLOYMENT.md)。
+参数调优见 [readme.md](../readme.md)；部署 / 整机 / 无显卡优化见 [DEPLOYMENT.md](DEPLOYMENT.md)。
 
 ---
 
@@ -11,7 +11,7 @@
 |------|----------|
 | **本文 DEBUGGING.md** | 一步步：怎么启动、怎么看、出问题查哪 |
 | `readme.md` | 调参：轨迹飘、落点不准、反应慢 |
-| `DEPLOYMENT.md` | CUDA、D455i 安装、Jetson 检查表 |
+| `DEPLOYMENT.md` | CUDA、RealSense、**1260P/EtherCAT 整机**、**无显卡模型优化**（§五–§六） |
 | 根目录 `README.md` | 架构、模式切换、后续计划 |
 
 ---
@@ -139,7 +139,7 @@ ros2 topic hz /volleyball_pose
 ```
 
 - 视频 15 Hz 输入，pose 约 **6–8 Hz** → YOLO 推理是瓶颈（正常）
-- 目标：开发阶段 ≥ 6 Hz 可用；实战 Jetson + TensorRT 再提
+- 目标：开发阶段 ≥ 6 Hz 可用；实战见 [DEPLOYMENT §六](DEPLOYMENT.md#六无显卡--cpu-推理与模型优化)（1260P 小模型 / OpenVINO / Jetson TensorRT）
 
 加速：`YOLO_DEVICE=cuda ./start_all.sh` 或 `FRAME_RATE=10.0`
 
@@ -197,7 +197,7 @@ ros2 topic echo /ball_prediction
 ⬜ 4. bash scripts/install_realsense_deps.sh
 ⬜ 5. 接 D455i → PIPELINE_MODE=realsense ./start_all.sh
 ⬜ 6. 对比 bbox vs depth 的 Z 抖动和落点误差
-⬜ 7. 上机器人：换真实 TF、标定、Jetson 部署
+⬜ 7. 上机器人：换真实 TF、标定、对接控制机（1260P/Jetson，见 DEPLOYMENT §五）
 ```
 
 有问题时记录：`/debug_image` 截图、`ros2 topic hz` 输出、终端最后 20 行 log。

@@ -1,6 +1,6 @@
 # 部署与硬件加速指南
 
-本文档说明：**开发机（RTX 4060）验证 CUDA**、**传统 RGB 视频模式**、**RealSense D455i 深度模式** 三条路径。  
+本文档说明：**开发机（RTX 4060）CUDA**、**RealSense D455i**、**1260P 无显卡工控机**、**EtherCAT 整机联调** 等部署路径。  
 代码默认 **`position.mode=bbox`（传统相机）**；深度相机装好驱动后切到 **`depth`** 即可，无需改 C++ 逻辑。
 
 ---
@@ -69,10 +69,11 @@ $$
 
 ### A. 软件与性能
 
-- [ ] 在 **Jetson（或最终小电脑）** 上 `colcon build` 通过
-- [ ] 实测处理间隔可接受（不是 PC 上的 fps，是板子上的）
-- [ ] `yolo.device` 在板子上真的在用 GPU（不是 silent 回退 CPU）
-- [ ] 下游节点能收到 `/volleyball_pose`、`/ball_prediction`
+- [ ] 在 **最终比赛机**（Jetson / 1260P / 视觉专机）上 `colcon build` 通过
+- [ ] 实测 **该机器上** 的 pose 间隔（不是 4060 上的 fps）
+- [ ] 无显卡机：`YOLO_DEVICE=cpu`，并按 [§六](#六无显卡--cpu-推理与模型优化) 评估是否需小模型 / OpenVINO / 视觉双机
+- [ ] 有 GPU 时：确认 `yolo.device` 未 silent 回退 CPU
+- [ ] 下游（1260P 控制机）能收到 `/volleyball_pose`、`/ball_prediction`
 
 ### B. 相机与 3D
 
@@ -325,7 +326,7 @@ ros2 run station_detector_cpp ball_detector_node \
 
 ---
 
-## 四、推荐工作流（平台未定阶段）
+## 四、推荐工作流
 
 ```
 阶段 1  [现在]  4060 + 视频 + bbox 模式
@@ -335,15 +336,181 @@ ros2 run station_detector_cpp ball_detector_node \
 阶段 2  [D455i 已接]  USE_REALSENSE=true + depth 模式
          → 驱动/话题已验证；有球时对比 bbox vs depth 的 Z 抖动与落点
 
-阶段 3  [队友确认 Jetson]  板上 colcon build + TensorRT
-         → 定最终 fps 和模型大小
+阶段 3  [定比赛主控]  见 §五：Jetson **或** 1260P 工控机 **或** 视觉/控制双机
+         → 板上 colcon build + 实测 fps（无显卡见 §六）
 
-阶段 4  [上机器人]  换真实 TF、标定、调 max_physical_speed
+阶段 4  [上机器人]  换真实 TF、标定、对接 EtherCAT/颠球机构、调 max_physical_speed
 ```
 
 ---
 
-## 五、常见问题
+## 五、机器人整机架构（EtherCAT / 1260P / 颠球）
+
+视觉仓库只负责 **看球 → `/volleyball_pose` / `/ball_prediction`**；接球机构、颠球、EtherCAT 主站由队友运动控制组实现。联调前建议对齐下面分工。
+
+### 5.1 「以太猫」是什么？
+
+队友说的 **以太猫** 一般指 **EtherCAT**（工业实时以太网）：主站（通常是 x86 工控机）以 **1 ms 甚至更短周期** 与伺服驱动器、IO 模块通信。
+
+| 接法 | 有没有 STM32「下位机」 | 说明 |
+|------|------------------------|------|
+| **EtherCAT 伺服直驱** | 往往**没有**单独 MCU | 1260P 当 **EtherCAT 主站**；驱动器/IO 是从站 |
+| **CAN + STM32** | **有** | 上位机发目标 → 下位机跑电机环 + 颠球时序 |
+| **混合** | **部分有** | 关节走 EtherCAT；颠球气缸/步进走 **IO 模块或单独 MCU** |
+
+**不是「只剩一台小电脑」**，而是：传统下位机角色可能由 **伺服驱动 + EtherCAT IO** 承担；**颠球机构**仍要单独接 IO 或 MCU。
+
+### 5.2 1260P 工控机 vs Jetson
+
+| | **1260P x86 工控机** | **Jetson Orin 等** |
+|--|----------------------|---------------------|
+| 典型用途 | EtherCAT 主站 + ROS2 控制 +（可选）视觉 | GPU 视觉、边缘 AI |
+| 与 EtherCAT | 队里栈成熟（PREEMPT_RT + 主站软件） | 能做但门槛高，很多队不用 |
+| 视觉 YOLO | **无独显则纯 CPU**，偏慢（见 §六） | TensorRT，15–30 fps 可期 |
+| 本仓库编译 | `x86_64 colcon build`（与 4060 同架构） | `aarch64` 需重编 |
+
+**1260P 够控、不够爽地跑 YOLO**：运动 + 颠球 + EtherCAT 通常 OK；**同机再跑 640 YOLO** 容易只有 **2–6 Hz**。
+
+### 5.3 推荐整机拓扑
+
+**方案 A：双机（视觉 + 控制，最稳）**
+
+```text
+[视觉机] 4060 笔记本 / 带 GPU 的小主机 / Jetson
+  RealSense + ball_detector_node
+  发布 /volleyball_pose、/ball_prediction（局域网 ROS2）
+
+[控制机] 1260P（EtherCAT 主站）
+  订阅视觉话题 → 接球机构 + 颠球 IO
+  不跑 YOLO
+```
+
+**方案 B：单机 1260P（省设备，fps 要实测）**
+
+```text
+1260P：EtherCAT + ROS2 + RealSense + CPU YOLO + 颠球
+```
+
+适合：颠球间隔 ≥1 s、检测 **≥5 Hz** 可接受、模型已按 §六 缩小。
+
+**方案 C：1260P 控制 + 独立 MCU 颠球**
+
+颠球硬节拍 / 气路安全 → STM32 管颠球；1260P 管 EtherCAT 与接球逻辑。
+
+### 5.4 颠球与视觉的时序
+
+```text
+颠球触发 → 球出手 → 相机跟踪 → KF/轨迹 → 落点 → 接球机构
+```
+
+- 视觉节点 **不驱动颠球**；全队需约定颠球时刻与 `header.stamp` 是否对齐。
+- 接球准备时间 + 颠球间隔决定 **最低检测 Hz**（见 §六 帧率表）。
+- 下游只需订阅 **`/volleyball_pose`**（滤波后 3D）和 **`/ball_prediction`**（落点）。
+
+### 5.5 联调前问队友的三句话
+
+1. 1260P **要不要同机跑 YOLO**，还是只跑 EtherCAT + 接球？  
+2. 颠球接 **EtherCAT IO** 还是 **STM32/CAN**？  
+3. 颠球间隔、接球准备时间各多少 → 定最低 fps。
+
+---
+
+## 六、无显卡 / CPU 推理与模型优化
+
+目标平台：**1260P 等无 NVIDIA 独显**的工控机。当前代码路径：**OpenCV DNN + ONNX**（`yolo_inference.cpp`），输入 **硬编码 640×640**。
+
+### 6.1 帧率粗估
+
+| 配置 | 大致 `/volleyball_pose` 频率 |
+|------|------------------------------|
+| 现有模型 @640，OpenCV CPU | ~2–5 Hz |
+| **YOLOv8n @416**，OpenCV CPU | ~5–10 Hz |
+| **YOLOv8n @416 + OpenVINO** | ~10–18 Hz |
+| 跳帧（每 2 帧检 1 次）+ KF 补中间 | 跟踪更密，检测 Hz ×2 体感 |
+| 4060 + CUDA（对照） | ~6–8 Hz（已测） |
+| Jetson Orin + TensorRT | ~15–30 Hz（模型小） |
+
+颠球 **1–2 s 一颗** 时，**8 Hz 检测 + KF** 往往可用；连续快颠目标 **15 Hz+**。
+
+### 6.2 重新训练：把模型做小（推荐）
+
+| 项 | 建议 |
+|----|------|
+| 骨干 | **YOLOv8n**（勿用 s/m） |
+| 类别 | **单类 `volleyball`**（`single_cls=True`） |
+| 输入 | 先 **416**，够再试 **320** |
+| 数据 | RealSense 实拍、顶光、球网、运动模糊、远近距离 |
+| 数量 | 训练 800+ / 验证 150+（越多越好） |
+
+**训练示例（Ultralytics，单独训练项目即可）：**
+
+```bash
+pip install ultralytics
+
+yolo detect train \
+  model=yolov8n.pt \
+  data=volleyball.yaml \
+  imgsz=416 \
+  epochs=150 \
+  batch=16 \
+  patience=30 \
+  single_cls=True
+```
+
+`volleyball.yaml` 示例：
+
+```yaml
+path: /path/to/dataset
+train: images/train
+val: images/val
+nc: 1
+names:
+  0: volleyball
+```
+
+**导出 ONNX（与 C++ 对齐）：**
+
+```bash
+yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz=416 opset=12 simplify=True
+```
+
+⚠️ 导出 **416** 后须把 `yolo_inference.cpp` 里 `inp_w/inp_h` 改为 **416**（或后续做成 yaml 参数）。  
+更完整的数据集说明见 [legacy/TRAINING_GUIDE.md](../legacy/TRAINING_GUIDE.md)。
+
+**训练注意：**
+
+- 含 **运动模糊、部分出画、误检背景**（灯、人头）。  
+- 验证 **远距离 recall**，不只看 mAP。  
+- 新 ONNX 先在 **4060 同一视频** 上与旧 `best.onnx` 对比，再上 1260P 测 Hz。
+
+### 6.3 Intel 1260P：OpenVINO（优先尝试）
+
+1260P 无独显时，**OpenVINO 跑 ONNX** 常比 OpenCV 默认 CPU **快 2–4 倍**。
+
+- OpenCV 编译带 OpenVINO 时，可设 `DNN_BACKEND_INFERENCE_ENGINE` + `DNN_TARGET_CPU`。  
+- 或 **ONNX Runtime + OpenVINO EP**（需额外集成，当前仓库尚未内置）。
+
+工控机上先验证 OpenVINO 环境，再测同模型 fps；**代码侧 OpenVINO 开关**可作为后续 PR。
+
+### 6.4 不改训练也能做的
+
+| 举措 | 做法 |
+|------|------|
+| 降相机分辨率 | RealSense 彩色 **640×480@30** |
+| 明确 CPU | `config/pipeline.conf` → `YOLO_DEVICE=cpu` |
+| 跳帧检测 | 每 N 帧跑一次 YOLO，中间靠 KF（**待实现**） |
+| ROI 跟踪 | 有框后只裁局部 patch 推理（**待实现**） |
+| CPU 绑核 | EtherCAT 与视觉分 P 核，避免互相拖死 |
+
+### 6.5 推荐优化顺序
+
+1. 训 **YOLOv8n 单类 @416** → 导出 ONNX → 4060 验效果  
+2. 1260P 装 **OpenVINO** → 测 fps  
+3. 仍不够 → 跳帧 + ROI（代码）或 **视觉专机**（§5.3 方案 A）
+
+---
+
+## 七、常见问题
 
 **Q: 深度模式 debug 仍显示 Searching，但 YOLO 有框？**  
 A: 多为 depth 采样失败（话题路径错、未对齐、时间戳不同步、深度为 0）。查：
@@ -364,9 +531,15 @@ A: `-p detection.emergency_bypass:=true`（仅调试，不建议比赛用）。
 **Q: 4060 上 cuda 设了还是慢？**  
 A: 看编译日志是否有 `OpenCV CUDA detected`；没有则需按 §1.3 重编 OpenCV。
 
+**Q: 队友要用 EtherCAT / 1260P，不用 Jetson？**  
+A: 见 [§五](#五机器人整机架构ethercat--1260p--颠球)。视觉可双机；单机无显卡见 §六。
+
+**Q: 1260P 无显卡，fps 太低怎么办？**  
+A: YOLOv8n @416 重训 + OpenVINO；仍不够则视觉专机或等跳帧/ROI 功能。
+
 ---
 
-## 六、文件索引
+## 八、文件索引
 
 | 文件 | 作用 |
 |------|------|

@@ -468,7 +468,7 @@ VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 
 - [README.md](README.md) — 架构、**方法论与数学模型**、快速开始
 - [DEBUGGING.md](src/station_detector_cpp/docs/DEBUGGING.md) — 分层排查
-- [DEPLOYMENT.md](src/station_detector_cpp/docs/DEPLOYMENT.md) — CUDA / RealSense / Jetson
+- [DEPLOYMENT.md](src/station_detector_cpp/docs/DEPLOYMENT.md) — CUDA / RealSense / **1260P·EtherCAT 整机** / **无显卡模型优化**
 - [readme.md](src/station_detector_cpp/readme.md) — **参数调优速查**（现象 → 旋钮）
 
 ---
@@ -481,27 +481,27 @@ VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 
 1. RealSense + 真球 — `USE_REALSENSE=true ./start_all.sh`，验证 `/volleyball_pose` 与 depth 精度
 2. 替换占位 static TF → 机器人 URDF / 标定
-3. Jetson 部署 + TensorRT
-4. fps 优化（可选，当前 PC 约 6–8 Hz pose）
-5. 下游机构对接 `/volleyball_pose`
+3. 定比赛主控：**Jetson** 或 **1260P 工控机**（见 DEPLOYMENT §五）+ 无显卡则 **YOLOv8n 小模型**（§六）
+4. fps 优化：OpenVINO / 跳帧 ROI（可选，当前 PC CUDA 约 6–8 Hz pose）
+5. 下游机构（EtherCAT 控制机）对接 `/volleyball_pose`
 
-建议：**先插 D455i 测 depth，再上 Jetson。**
+建议：**先 D455i 有球实测 → 与队友定单机/双机架构 → 再训小模型上 1260P。**
 
 ---
 
 ## 迁移到机器人上位机
 
-代码（git clone）可直接拷过去，但**环境要重做一遍**：
+代码（git clone）可直接拷过去，但**环境要重做一遍**。主控可能是 **Jetson** 或 **1260P x86 工控机**（EtherCAT），详见 [DEPLOYMENT.md §五–§六](src/station_detector_cpp/docs/DEPLOYMENT.md#五机器人整机架构ethercat--1260p--颠球)。
 
-| 步骤 | 开发机（4060） | 机器人（Jetson 等） |
-|------|----------------|---------------------|
-| ROS2 Humble | 已有 | 按 Jetson 文档装 |
-| `colcon build` | 已有 | **必须重编**（架构不同） |
-| OpenCV CUDA | `/usr/local` 自编译 | JetPack 自带，或板子上重编 |
-| ONNX 模型 | 拷贝 `best.onnx` | 同左 |
-| RealSense 驱动 | `install_realsense_deps.sh` | 板子上再跑一遍 |
-| TensorRT | 4060 的 engine **不能**给 Jetson 用 | 需在 Jetson 本机转 engine |
-| `pipeline.conf` | `USE_REALSENSE=true` | 同左，改 TF/标定后上机 |
+| 步骤 | 开发机（4060） | 比赛机（Jetson） | 比赛机（1260P，无独显） |
+|------|----------------|------------------|-------------------------|
+| ROS2 Humble | 已有 | Jetson 文档 | 工控机 Ubuntu |
+| `colcon build` | 已有 | **aarch64 重编** | **x86_64 重编**（与 4060 同架构） |
+| YOLO 推理 | OpenCV CUDA | TensorRT / CUDA | **CPU 或 OpenVINO**；建议 YOLOv8n @416 |
+| ONNX 模型 | 拷贝 `best.onnx` | 同左 | 同左（小模型需重训，见 DEPLOYMENT §6.2） |
+| RealSense | `install_realsense_deps.sh` | 板子上再跑 | 同左 |
+| TensorRT engine | 4060 的 **不能** 给 Jetson | Jetson 本机转 | 无 NVIDIA 则不用 |
+| 与机构通信 | — | 订阅 `/volleyball_pose` | 常作控制机；视觉可另设专机 |
 
-**不用重写的**：算法代码、YAML 参数、launch 逻辑。  
-**必须重做的**：编译、CUDA/OpenCV、TensorRT、相机驱动、真实 TF 标定。
+**不用重写的**：算法、YAML、launch、`/volleyball_pose` 话题接口。  
+**必须重做的**：编译、推理后端、相机驱动、真实 TF、与队友对齐 EtherCAT/颠球时序。

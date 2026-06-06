@@ -1,7 +1,7 @@
 # 参数调优手册
 
 > **数学模型与公式**（KF 矩阵、阻力积分、数据流图）：见仓库根目录 [README.md](../../README.md#方法论与数学模型)  
-> 硬件部署 / CUDA / RealSense：见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)  
+> 硬件部署 / CUDA / RealSense / **1260P·EtherCAT** / **无显卡优化**：见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)（§五–§六）  
 > 从零调试：见 [docs/DEBUGGING.md](docs/DEBUGGING.md)
 
 ## 核心链路
@@ -112,4 +112,4 @@
 
 改 YAML 后：`./stop_all.sh && ./start_all.sh`
 
-当前 PC 上 pose 约 **6–8 Hz** 属正常；以落点稳定性为先，fps 上 Jetson 再优化。
+当前 PC（4060+CUDA）pose 约 **6–8 Hz**。1260P 无独显见 [DEPLOYMENT §六](docs/DEPLOYMENT.md#六无显卡--cpu-推理与模型优化)（YOLOv8n @416 + OpenVINO 目标 ~10–18 Hz）。
