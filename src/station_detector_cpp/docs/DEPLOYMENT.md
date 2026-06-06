@@ -475,7 +475,8 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz=416 opset=
 ```
 
 ⚠️ 导出 **416** 后须把 `yolo_inference.cpp` 里 `inp_w/inp_h` 改为 **416**（或后续做成 yaml 参数）。  
-更完整的数据集说明见 [legacy/TRAINING_GUIDE.md](../legacy/TRAINING_GUIDE.md)。
+更完整的数据集说明见 [MODEL_TRAINING_BRIEF.md](MODEL_TRAINING_BRIEF.md)（**可直接转发给训模型同学**）。  
+简要命令见下；细节见 [legacy/TRAINING_GUIDE.md](../legacy/TRAINING_GUIDE.md)。
 
 **训练注意：**
 

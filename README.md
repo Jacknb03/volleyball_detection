@@ -468,7 +468,8 @@ VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 
 - [README.md](README.md) — 架构、**方法论与数学模型**、快速开始
 - [DEBUGGING.md](src/station_detector_cpp/docs/DEBUGGING.md) — 分层排查
-- [DEPLOYMENT.md](src/station_detector_cpp/docs/DEPLOYMENT.md) — CUDA / RealSense / **1260P·EtherCAT 整机** / **无显卡模型优化**
+- [DEPLOYMENT.md](src/station_detector_cpp/docs/DEPLOYMENT.md) — CUDA / RealSense / 1260P·EtherCAT / 无显卡优化
+- [MODEL_TRAINING_BRIEF.md](src/station_detector_cpp/docs/MODEL_TRAINING_BRIEF.md) — **给队友的练模型需求单**
 - [readme.md](src/station_detector_cpp/readme.md) — **参数调优速查**（现象 → 旋钮）
 
 ---
