@@ -327,6 +327,12 @@ ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/stati
 # install(DIRECTORY "launch/" "DESTINATION" "share/station_detector_cpp")
 ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "launch/" "DESTINATION" "share/station_detector_cpp")
 
+# install(PROGRAMS "scripts/video_publisher.py" "DESTINATION" "lib/station_detector_cpp")
+ament_cmake_symlink_install_programs("/home/song/volleyball_detection/src/station_detector_cpp" PROGRAMS "scripts/video_publisher.py" "DESTINATION" "lib/station_detector_cpp")
+
+# install(DIRECTORY "videos/" "DESTINATION" "share/station_detector_cpp")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "videos/" "DESTINATION" "share/station_detector_cpp")
+
 # install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/station_detector_cpp" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/station_detector_cpp" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 

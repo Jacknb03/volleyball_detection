@@ -2,7 +2,7 @@
 """
 One-command entry for the C++ YOLO (ONNX) pipeline:
 - static TF (odom -> camera_optical_frame)
-- video publisher (station_detector/video_publisher.py)
+- video publisher (station_detector_cpp/video_publisher.py)
 - C++ detector node (station_detector_cpp/ball_detector_node)
 """
 
@@ -18,10 +18,9 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     cpp_share = FindPackageShare("station_detector_cpp").find("station_detector_cpp")
-    py_share = FindPackageShare("station_detector").find("station_detector")
 
-    default_params = os.path.join(cpp_share, "config", "ball_detector_params.yaml")
-    default_video = os.path.join(py_share, "videos", "test.mp4")
+    default_params = os.path.join(cpp_share, "config", "ball_detector_params_video.yaml")
+    default_video = os.path.join(cpp_share, "videos", "test.mp4")
     default_model = os.path.join(cpp_share, "model", "best.onnx")
 
     params_file_arg = DeclareLaunchArgument("params_file", default_value=default_params)
@@ -57,7 +56,7 @@ def generate_launch_description():
     )
 
     video_pub = Node(
-        package="station_detector",
+        package="station_detector_cpp",
         executable="video_publisher.py",
         name="video_publisher",
         output="screen",

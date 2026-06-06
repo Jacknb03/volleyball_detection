@@ -1,23 +1,21 @@
+# 默认 = video 模式（bbox 估深）。深度相机请用 ball_detector_params_realsense.yaml
+# 或: ros2 launch station_detector_cpp yolo.launch.py pipeline_mode:=realsense
 ball_detector_node:
   ros__parameters:
     yolo:
-      # 实际运行时建议通过 launch 覆盖 model_path
       model_path: "model/best.onnx"
       model_type: "yolov8"
       conf_threshold: 0.18
       iou_threshold: 0.45
-      # auto | cpu | cuda（cuda 需 OpenCV 编译时启用 CUDA，见 docs/DEPLOYMENT.md）
       device: "auto"
       volleyball_classes:
         - "volleyball"
         - "Volleyball"
 
-    # 输入话题（RealSense 模式下在 launch 里 remap）
     input:
       image_topic: "/image_raw"
       camera_info_topic: "/camera_info"
 
-    # 3D 位置模式：bbox=传统 RGB 估深；depth=RGB-D 对齐深度图
     position:
       mode: "bbox"
       depth_topic: "/camera/aligned_depth_to_color/image_raw"
@@ -41,7 +39,6 @@ ball_detector_node:
       use_tracker: true
       h_ema_alpha: 0.3
       max_physical_speed: 25.0
-      # false=正常过滤链；true=调试时跳过类别/跟踪/验证（不推荐长期使用）
       emergency_bypass: false
 
     trajectory:

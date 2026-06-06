@@ -16,7 +16,7 @@ set(_station_detector_CONFIG_INCLUDED TRUE)
 
 # output package information
 if(NOT station_detector_FIND_QUIETLY)
-  message(STATUS "Found station_detector: 0.1.0 (${station_detector_DIR})")
+  message(STATUS "Found station_detector: 0.2.0 (${station_detector_DIR})")
 endif()
 
 # warn when using a deprecated package

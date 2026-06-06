@@ -99,5 +99,15 @@ install(
   FILES_MATCHING PATTERN "*.onnx"
 )
 
+install(PROGRAMS
+  scripts/video_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY videos/
+  DESTINATION share/${PROJECT_NAME}
+)
+
 # ---- ament 包 ----
 ament_package()

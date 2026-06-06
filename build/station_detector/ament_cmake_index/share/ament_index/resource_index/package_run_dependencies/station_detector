@@ -1,1 +1,1 @@
-rclpy;rclcpp;geometry_msgs;sensor_msgs;visualization_msgs;tf2_ros;tf2_geometry_msgs;cv_bridge;OpenCV;image_transport;camera_info_manager;yaml-cpp;ament_lint_auto;ament_lint_common
+rclpy;sensor_msgs;cv_bridge

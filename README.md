@@ -1,101 +1,190 @@
-# 排球检测与落点预测（ROS2）
+# 排球检测与落点预测（ROS2 Humble）
 
-一个 ROS2 视觉子系统：**YOLO 2D 检测 → 3D 位置估计 → TF 坐标变换 → 卡尔曼滤波 → 物理落点/轨迹预测**。  
-本仓库是一个 **ROS2（colcon）工作区**，默认主线为 **C++ + ONNX（YOLO）** 管线。
-
-## 效果截图
+基于 **YOLOv8（ONNX）+ 卡尔曼滤波 + 物理轨迹预测** 的排球 3D 跟踪系统。  
+一个 C++ 节点 `ball_detector_node` 同时支持 **视频 bbox 估深** 与 **RealSense RGB-D 深度** 两种 3D 方案，通过 launch / YAML 切换，无需改代码。
 
 ![demo](assets/demo.png)
 
-## 快速开始（默认主线：C++ YOLO / ONNX）
+---
 
-1) 把模型放到（或用启动参数指定）：
+## 架构
 
-- `src/station_detector_cpp/model/best.onnx`（默认路径，**不提交到git**）
+```mermaid
+flowchart LR
+  subgraph input [输入源]
+    V[视频文件]
+    RS[RealSense D455i]
+  end
 
-2) 编译并 source：
+  subgraph detect [感知]
+    YOLO[YOLO ONNX 2D 检测]
+  end
+
+  subgraph depth [3D 位置]
+    BBOX[bbox 估深]
+    DEPTH[对齐深度采样]
+  end
+
+  subgraph world [世界系]
+    TF[TF to odom]
+    KF[卡尔曼滤波]
+    PHY[重力加阻力预测]
+  end
+
+  V --> YOLO
+  RS --> YOLO
+  YOLO --> BBOX
+  YOLO --> DEPTH
+  BBOX --> TF
+  DEPTH --> TF
+  TF --> KF --> PHY
+  PHY --> OUT["volleyball_pose / ball_prediction"]
+```
+
+### 实现思路
+
+| 阶段 | 做什么 |
+|------|--------|
+| **2D 检测** | OpenCV DNN 加载 ONNX，输出排球 bbox |
+| **3D 位置** | **bbox**：`Z ≈ 焦距 × 球直径 / 框高`；**depth**：框中心读对齐深度 |
+| **坐标变换** | 相机光学系 → `odom`（静态 TF 占位，上机器人后换 URDF） |
+| **时序滤波** | 6 状态卡尔曼，丢帧预测、速度门控、视频循环自动 reset |
+| **轨迹预测** | 重力 + 空气阻力积分，输出落点与时间 |
+
+---
+
+## 快速开始
+
+### 1. 编译
 
 ```bash
-colcon build --symlink-install
+cd ~/volleyball_detection
 source /opt/ros/humble/setup.bash
+colcon build --symlink-install
 source install/setup.bash
 ```
 
-3) 启动（视频模式，含静态TF + 视频发布 + C++检测节点）：
+模型放到 `src/station_detector_cpp/model/best.onnx`（不提交 git）。
+
+### 2. 启动（视频模式）
 
 ```bash
 ./start_all.sh
 ```
 
-也可以直接用 launch（更清晰、便于写入你的作品集复现实验步骤）：
+打开 **检测 launch + RViz**（看 `/debug_image` 和轨迹，不用 rqt）。
+
+### 3. RealSense 深度模式
 
 ```bash
-ros2 launch station_detector_cpp yolo_cpp_video.launch.py \
-  video_path:=/abs/path/to/video.mp4 \
-  model_path:=/abs/path/to/best.onnx
+bash scripts/install_realsense_deps.sh   # 首次
+PIPELINE_MODE=realsense ./start_all.sh
 ```
 
-停止：
+### 4. 停止
 
 ```bash
 ./stop_all.sh
 ```
 
-## 可选方案（不影响主线启动）
+---
 
-### 方案 B：Python YOLO（`station_detector` 包）
+## 两种 3D 方案
 
-适合快速验证训练出来的模型或做算法对照（依赖 Python 环境、torch/ultralytics）。
+**改 `config/pipeline.conf` 即可，然后 `./start_all.sh`：**
 
 ```bash
-ros2 launch station_detector yolo_test_video.launch.py
-ros2 launch station_detector yolo_real_camera.launch.py
+USE_REALSENSE=false    # 视频 + bbox 估深
+USE_REALSENSE=true     # RealSense D455i + 深度
+YOLO_DEVICE=cuda       # GPU 推理
 ```
 
-### 方案 C（Legacy）：传统 OpenCV 圆形/颜色分割（`station_detector` 包）
+| | **video** | **realsense** |
+|--|-----------|---------------|
+| 配置 | `USE_REALSENSE=false` | `USE_REALSENSE=true` |
+| YAML | `ball_detector_params_video.yaml` | `ball_detector_params_realsense.yaml` |
+| 状态 | 已验证 | 待 D455i 实测 |
 
-- **定位**：备用/对照实现  
-- **适用性**：在“光照稳定 / 背景简单 / 颜色强先验”的场景可能有价值
+命令行仍可临时覆盖：`YOLO_DEVICE=cpu ./start_all.sh`
+
+---
 
 ## 仓库结构
 
 ```
 volleyball_detection/
-├── src/                      
-│   ├── mindvision_camera/      # 工业相机驱动（MindVision）
-│   ├── station_detector/       # 传统法 + Python YOLO 工具链/launch
-│   └── station_detector_cpp/   # 主线：C++ YOLO(ONNX)+滤波+预测
-├── start_all.sh                # 主入口：启动 C++ YOLO（可改 env 覆盖路径）
-├── stop_all.sh
-├── build/ install/ log/        # colcon 输出（已加 .gitignore）
-└── README.md
+├── start_all.sh                 # PIPELINE_MODE=video|realsense
+├── start_realsense.sh           # 别名
+├── config/volleyball_debug.rviz
+├── scripts/install_realsense_deps.sh
+└── src/
+    ├── station_detector_cpp/    # 主包
+    ├── realsense2_camera/       # 驱动源码（或 apt）
+    └── mindvision_camera/       # 未用可忽略
 ```
 
-## 配置与路径约定
+---
 
-- **模型路径**：建议始终通过 launch 参数覆盖 `model_path`，而不是在 YAML 里写死绝对路径。
-- **主参数文件**：`src/station_detector_cpp/config/ball_detector_params.yaml`
-- **调试步骤（推荐先看）**：`src/station_detector_cpp/docs/DEBUGGING.md`
-- **部署 / CUDA / RealSense**：`src/station_detector_cpp/docs/DEPLOYMENT.md`
-- **视频发布**：由 `station_detector/scripts/video_publisher.py` 提供（launch 已集成）
+## 环境变量
 
-`start_all.sh` 支持环境变量覆盖：
+在 `config/pipeline.conf` 里改（推荐），或命令行临时覆盖：
 
 ```bash
-VIDEO_PATH=/abs/path/to/video.mp4 MODEL_PATH=/abs/path/to/best.onnx ./start_all.sh
+USE_REALSENSE=false|true
+YOLO_DEVICE=auto|cpu|cuda
+VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 ```
 
-## 常用观测
+---
 
-```bash
-ros2 node list
-ros2 topic list
-ros2 topic echo /volleyball_pose
-ros2 topic echo /volleyball_trajectory
-```
+## 输出话题
 
-## 系统要求（主线）
+| 话题 | 说明 |
+|------|------|
+| `/debug_image` | RViz 看这个 |
+| `/volleyball_pose` | 3D 位姿 |
+| `/volleyball_trajectory` | 抛物线 Marker |
+| `/ball_prediction` | 落点 + 时间 |
 
-- Ubuntu 22.04 + ROS2 Humble
-- OpenCV / Eigen3 / tf2（C++包依赖）
+---
 
+## 文档
+
+- [DEBUGGING.md](src/station_detector_cpp/docs/DEBUGGING.md) — 分层排查
+- [DEPLOYMENT.md](src/station_detector_cpp/docs/DEPLOYMENT.md) — CUDA / RealSense / Jetson
+- [readme.md](src/station_detector_cpp/readme.md) — 参数调优
+
+---
+
+## 进度与后续
+
+**已完成：** 视频链路、bbox 估深、KF、轨迹、CUDA 可选、统一模式切换、RViz 可视化
+
+**待做：**
+
+1. RealSense D455i 实机 — `PIPELINE_MODE=realsense ./start_all.sh`
+2. 替换占位 static TF → 机器人 URDF / 标定
+3. Jetson 部署 + TensorRT
+4. fps 优化（可选，当前 PC 约 6–8 Hz pose）
+5. 下游机构对接 `/volleyball_pose`
+
+建议：**先插 D455i 测 depth，再上 Jetson。**
+
+---
+
+## 迁移到机器人上位机
+
+代码（git clone）可直接拷过去，但**环境要重做一遍**：
+
+| 步骤 | 开发机（4060） | 机器人（Jetson 等） |
+|------|----------------|---------------------|
+| ROS2 Humble | 已有 | 按 Jetson 文档装 |
+| `colcon build` | 已有 | **必须重编**（架构不同） |
+| OpenCV CUDA | `/usr/local` 自编译 | JetPack 自带，或板子上重编 |
+| ONNX 模型 | 拷贝 `best.onnx` | 同左 |
+| RealSense 驱动 | `install_realsense_deps.sh` | 板子上再跑一遍 |
+| TensorRT | 4060 的 engine **不能**给 Jetson 用 | 需在 Jetson 本机转 engine |
+| `pipeline.conf` | `USE_REALSENSE=true` | 同左，改 TF/标定后上机 |
+
+**不用重写的**：算法代码、YAML 参数、launch 逻辑。  
+**必须重做的**：编译、CUDA/OpenCV、TensorRT、相机驱动、真实 TF 标定。

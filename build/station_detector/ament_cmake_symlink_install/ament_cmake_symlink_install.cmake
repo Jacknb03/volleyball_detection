@@ -315,14 +315,11 @@ message(STATUS "Execute custom install script")
 
 # begin of custom install code
 
-# install("TARGETS" "station_pose_estimator" "DESTINATION" "lib/station_detector")
-include("/home/song/volleyball_detection/build/station_detector/ament_cmake_symlink_install_targets_0_${CMAKE_INSTALL_CONFIG_NAME}.cmake")
+# install(PROGRAMS "scripts/video_publisher.py" "DESTINATION" "lib/station_detector")
+ament_cmake_symlink_install_programs("/home/song/volleyball_detection/src/station_detector" PROGRAMS "scripts/video_publisher.py" "DESTINATION" "lib/station_detector")
 
-# install(PROGRAMS "scripts/static_image_pub.py" "scripts/video_publisher.py" "scripts/yolo_volleyball_node.py" "scripts/yolo_detector.py" "scripts/kalman_tracker.py" "scripts/detection_validator.py" "DESTINATION" "lib/station_detector")
-ament_cmake_symlink_install_programs("/home/song/volleyball_detection/src/station_detector" PROGRAMS "scripts/static_image_pub.py" "scripts/video_publisher.py" "scripts/yolo_volleyball_node.py" "scripts/yolo_detector.py" "scripts/kalman_tracker.py" "scripts/detection_validator.py" "DESTINATION" "lib/station_detector")
-
-# install(DIRECTORY "launch" "config" "test_images" "DESTINATION" "share/station_detector" "PATTERN_EXCLUDE" ".gitkeep")
-ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector" DIRECTORY "launch" "config" "test_images" "DESTINATION" "share/station_detector" "PATTERN_EXCLUDE" ".gitkeep")
+# install(DIRECTORY "videos" "DESTINATION" "share/station_detector")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector" DIRECTORY "videos" "DESTINATION" "share/station_detector")
 
 # install(FILES "/home/song/volleyball_detection/build/station_detector/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/station_detector" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector" FILES "/home/song/volleyball_detection/build/station_detector/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/station_detector" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")

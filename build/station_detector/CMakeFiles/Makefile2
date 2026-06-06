@@ -63,7 +63,7 @@ CMAKE_BINARY_DIR = /home/song/volleyball_detection/build/station_detector
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
-all: CMakeFiles/station_pose_estimator.dir/all
+all:
 .PHONY : all
 
 # The main recursive "preinstall" target.
@@ -73,7 +73,6 @@ preinstall:
 # The main recursive "clean" target.
 clean: CMakeFiles/uninstall.dir/clean
 clean: CMakeFiles/station_detector_uninstall.dir/clean
-clean: CMakeFiles/station_pose_estimator.dir/clean
 .PHONY : clean
 
 #=============================================================================
@@ -127,32 +126,6 @@ station_detector_uninstall: CMakeFiles/station_detector_uninstall.dir/rule
 CMakeFiles/station_detector_uninstall.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/station_detector_uninstall.dir/build.make CMakeFiles/station_detector_uninstall.dir/clean
 .PHONY : CMakeFiles/station_detector_uninstall.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/station_pose_estimator.dir
-
-# All Build rule for target.
-CMakeFiles/station_pose_estimator.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/station_pose_estimator.dir/build.make CMakeFiles/station_pose_estimator.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/station_pose_estimator.dir/build.make CMakeFiles/station_pose_estimator.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/song/volleyball_detection/build/station_detector/CMakeFiles --progress-num=1,2,3,4,5,6,7 "Built target station_pose_estimator"
-.PHONY : CMakeFiles/station_pose_estimator.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/station_pose_estimator.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/song/volleyball_detection/build/station_detector/CMakeFiles 7
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/station_pose_estimator.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/song/volleyball_detection/build/station_detector/CMakeFiles 0
-.PHONY : CMakeFiles/station_pose_estimator.dir/rule
-
-# Convenience name for target.
-station_pose_estimator: CMakeFiles/station_pose_estimator.dir/rule
-.PHONY : station_pose_estimator
-
-# clean rule for target.
-CMakeFiles/station_pose_estimator.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/station_pose_estimator.dir/build.make CMakeFiles/station_pose_estimator.dir/clean
-.PHONY : CMakeFiles/station_pose_estimator.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

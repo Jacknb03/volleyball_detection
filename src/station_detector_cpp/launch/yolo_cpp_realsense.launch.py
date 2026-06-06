@@ -26,7 +26,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     cpp_share = FindPackageShare("station_detector_cpp").find("station_detector_cpp")
-    default_params = os.path.join(cpp_share, "config", "ball_detector_params.yaml")
+    default_params = os.path.join(cpp_share, "config", "ball_detector_params_realsense.yaml")
     default_model = os.path.join(cpp_share, "model", "best.onnx")
 
     params_file_arg = DeclareLaunchArgument("params_file", default_value=default_params)
