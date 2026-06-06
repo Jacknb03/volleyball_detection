@@ -245,11 +245,34 @@ KF 与速度门控现在使用 **`image header.stamp`**，不再用 `node->now()
 
 ### 3.1 安装驱动
 
-```bash
-sudo apt update
-sudo apt install ros-humble-realsense2-camera
+**报错 `Unable to locate package librealsense2-dev`？**  
+该包在 **Intel 官方 apt 源**，不在 Ubuntu 默认源里。用项目脚本一键装：
 
-realsense-viewer   # 确认 D455i RGB/Depth/IMU 正常
+```bash
+bash scripts/install_realsense_deps.sh
+```
+
+脚本会：
+1. 装 `ros-humble-realsense2-camera`（跑 `./start_all.sh` 必需）
+2. 添加 Intel 源，装 `librealsense2-utils`（含 `realsense-viewer`）和内核驱动
+
+**手动分步（可选）：**
+
+```bash
+# A) 仅 ROS 驱动（最小，无 realsense-viewer）
+sudo apt update
+sudo apt install ros-humble-realsense2-camera ros-humble-diagnostic-updater
+
+# B) Intel 源 + 调试工具（realsense-viewer）
+sudo mkdir -p /etc/apt/keyrings
+curl -sSf https://librealsense.intel.com/Debian/librealsense.pgp \
+  | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.intel.com/Debian/apt-repo $(lsb_release -cs) main" \
+  | sudo tee /etc/apt/sources.list.d/librealsense.list
+sudo apt update
+sudo apt install librealsense2-dkms librealsense2-utils librealsense2-dev
+
+realsense-viewer   # 插上 D455i，确认 RGB + Depth
 ```
 
 ### 3.2 启动
