@@ -584,9 +584,9 @@ private:
             has_last_measurement_world_ = true;
         }
         if (ball_found && !frame_has_fresh_detection) {
-            RCLCPP_ERROR(
+            RCLCPP_DEBUG(
                 get_logger(),
-                "PARADOX: YOLO detected box(es) but fresh_det=false. Reason: %s",
+                "Detection without 3D measurement: %s",
                 fresh_det_block_reason.c_str());
         }
         bool valid_track = ball_tracker_->isInitialized();
