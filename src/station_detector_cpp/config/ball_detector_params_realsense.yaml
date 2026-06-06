@@ -13,12 +13,12 @@ ball_detector_node:
         - "Volleyball"
 
     input:
-      image_topic: "/camera/color/image_raw"
-      camera_info_topic: "/camera/color/camera_info"
+      image_topic: "/camera/camera/color/image_raw"
+      camera_info_topic: "/camera/camera/color/camera_info"
 
     position:
       mode: "depth"
-      depth_topic: "/camera/aligned_depth_to_color/image_raw"
+      depth_topic: "/camera/camera/aligned_depth_to_color/image_raw"
       depth_max_stamp_delta_sec: 0.05
       depth_min_m: 0.3
       depth_max_m: 8.0

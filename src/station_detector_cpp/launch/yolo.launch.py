@@ -98,17 +98,20 @@ def _setup(context, *args, **kwargs):
         realsense = Node(
             package="realsense2_camera",
             executable="realsense2_camera_node",
+            namespace="camera",
             name="camera",
             output="screen",
             parameters=[
                 {
+                    "camera_name": "camera",
+                    "camera_namespace": "camera",
                     "enable_depth": True,
                     "enable_color": True,
-                    "enable_gyro": True,
-                    "enable_accel": True,
+                    "enable_gyro": False,
+                    "enable_accel": False,
                     "align_depth.enable": True,
-                    "depth_module.profile": "640,480,30",
-                    "rgb_camera.profile": "640,480,30",
+                    "depth_module.depth_profile": "640,480,30",
+                    "rgb_camera.color_profile": "640,480,30",
                 }
             ],
         )
