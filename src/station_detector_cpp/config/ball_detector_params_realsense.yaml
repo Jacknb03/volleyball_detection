@@ -1,5 +1,5 @@
 # RealSense D455i RGB-D：对齐深度采样模式
-# 启动: PIPELINE_MODE=realsense ./start_all.sh
+# 启动: USE_REALSENSE=true ./start_all.sh
 ball_detector_node:
   ros__parameters:
     yolo:
@@ -19,10 +19,12 @@ ball_detector_node:
     position:
       mode: "depth"
       depth_topic: "/camera/camera/aligned_depth_to_color/image_raw"
-      depth_max_stamp_delta_sec: 0.05
-      depth_min_m: 0.3
+      depth_sync_stamp: false           # YOLO 慢时用最新对齐深度，不按 RGB 时间戳拒采
+      depth_max_stamp_delta_sec: 0.30   # 仅 depth_sync_stamp: true 时生效
+      depth_inner_ratio: 0.5            # 检测框中心 50% 宽高（黄框）；越小采样区越小
+      depth_min_m: 0.15             # 举近相机时 <0.3m 也会被拒
       depth_max_m: 8.0
-      depth_patch_radius: 2
+      depth_patch_radius: 2             # 保留兼容；实际采样用 depth_inner_ratio
 
     kalman:
       process_noise: 0.05
@@ -36,7 +38,7 @@ ball_detector_node:
       max_detections: 3
       selection_method: "confidence"
       min_confidence: 0.18
-      use_tracker: true
+      use_tracker: false              # 多黄框时直接取 conf 最高
       h_ema_alpha: 0.3
       max_physical_speed: 25.0
       emergency_bypass: false

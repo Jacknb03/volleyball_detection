@@ -53,7 +53,7 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rclpy</exec_depend>
-  <!-- RealSense 模式需 realsense2_camera（apt 或 src 编译），见 start_realsense.sh -->
+  <!-- RealSense 模式需 apt 安装 ros-humble-realsense2-camera，见 scripts/install_realsense_deps.sh -->
 
   <export>
     <build_type>ament_cmake</build_type>

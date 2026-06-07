@@ -17,6 +17,7 @@
 #include <tf2/utils.h>
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -69,9 +70,11 @@ public:
         declare_parameter<std::string>("position.depth_topic",
                                       "/camera/aligned_depth_to_color/image_raw");
         declare_parameter<double>("position.depth_max_stamp_delta_sec", 0.05);
+        declare_parameter<bool>("position.depth_sync_stamp", false);
         declare_parameter<double>("position.depth_min_m", 0.3);
         declare_parameter<double>("position.depth_max_m", 8.0);
         declare_parameter<int>("position.depth_patch_radius", 2);
+        declare_parameter<double>("position.depth_inner_ratio", 0.6);
 
         declare_parameter<double>("trajectory.prediction_time", 0.5);
         declare_parameter<int>("trajectory.num_points", 10);
@@ -148,25 +151,31 @@ public:
         const auto image_topic = get_parameter("input.image_topic").as_string();
         const auto camera_info_topic = get_parameter("input.camera_info_topic").as_string();
 
-        // QoS：实时性优先
-        rclcpp::QoS qos(rclcpp::KeepLast(1));
-        qos.best_effort();
+        // 彩色流：best_effort 即可
+        rclcpp::QoS color_qos(rclcpp::KeepLast(1));
+        color_qos.best_effort();
+
+        // RealSense aligned_depth 默认 RELIABLE + TRANSIENT_LOCAL；不匹配则收不到任何帧
+        rclcpp::QoS depth_qos(rclcpp::KeepLast(5));
+        depth_qos.reliable();
+        depth_qos.transient_local();
 
         image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-            image_topic, qos,
+            image_topic, color_qos,
             std::bind(&BallDetectorNode::imageCallback, this, _1));
 
         camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-            camera_info_topic, 10,
+            camera_info_topic, color_qos,
             std::bind(&BallDetectorNode::cameraInfoCallback, this, _1));
 
         if (position_mode_ == "depth") {
             const auto depth_topic = get_parameter("position.depth_topic").as_string();
             depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
-                depth_topic, qos,
+                depth_topic, depth_qos,
                 std::bind(&BallDetectorNode::depthCallback, this, _1));
             RCLCPP_INFO(get_logger(),
-                        "Position mode=depth, subscribed to %s", depth_topic.c_str());
+                        "Position mode=depth, subscribed to %s (QoS: reliable+transient_local)",
+                        depth_topic.c_str());
         } else {
             RCLCPP_INFO(get_logger(), "Position mode=bbox (2D box height -> depth)");
         }
@@ -325,95 +334,186 @@ private:
         latest_depth_encoding_ = msg->encoding;
         latest_depth_stamp_ = rclcpp::Time(msg->header.stamp);
         has_latest_depth_ = !latest_depth_.empty();
+        ++depth_frames_received_;
+
+        if (!depth_first_frame_logged_) {
+            depth_first_frame_logged_ = true;
+            RCLCPP_INFO(
+                get_logger(),
+                "First depth frame: %dx%d encoding=%s",
+                latest_depth_.cols, latest_depth_.rows,
+                latest_depth_encoding_.c_str());
+        }
     }
 
-    std::optional<double> sampleDepthMeters(int u, int v,
-                                            const rclcpp::Time& color_stamp)
+    struct DepthSampleResult {
+        std::optional<double> depth_m;
+        std::string fail_reason{"unknown"};
+        int valid_samples{0};
+        cv::Rect sample_rect_color;
+    };
+
+    bool readDepthPixelMeters(int x, int y, double& depth_m) const
     {
+        if (latest_depth_encoding_ == sensor_msgs::image_encodings::TYPE_16UC1) {
+            const uint16_t raw = latest_depth_.at<uint16_t>(y, x);
+            if (raw == 0) {
+                return false;
+            }
+            depth_m = static_cast<double>(raw) * 0.001;
+            return true;
+        }
+        if (latest_depth_encoding_ == sensor_msgs::image_encodings::TYPE_32FC1) {
+            const float raw = latest_depth_.at<float>(y, x);
+            if (!(raw > 0.0f) || !std::isfinite(raw)) {
+                return false;
+            }
+            depth_m = static_cast<double>(raw);
+            return true;
+        }
+        return false;
+    }
+
+    DepthSampleResult sampleDepthInBBox(
+        float cx, float cy, float bbox_w, float bbox_h,
+        int color_w, int color_h,
+        const rclcpp::Time& color_stamp)
+    {
+        DepthSampleResult result;
+
         if (!has_latest_depth_ || latest_depth_.empty()) {
-            return std::nullopt;
+            result.fail_reason = "no depth frame";
+            return result;
         }
 
-        const double max_delta =
-            get_parameter("position.depth_max_stamp_delta_sec").as_double();
-        const double stamp_delta =
-            std::abs((color_stamp - latest_depth_stamp_).seconds());
-        if (stamp_delta > max_delta) {
-            RCLCPP_WARN_THROTTLE(
-                get_logger(), *get_clock(), 2000,
-                "Depth/RGB stamp delta %.3fs > %.3fs, skip depth sample",
-                stamp_delta, max_delta);
-            return std::nullopt;
-        }
-
-        const int radius = std::max(
-            0, static_cast<int>(get_parameter("position.depth_patch_radius").as_int()));
-        const int h = latest_depth_.rows;
-        const int w = latest_depth_.cols;
-        if (u < 0 || v < 0 || u >= w || v >= h) {
-            return std::nullopt;
-        }
-
-        std::vector<double> samples;
-        samples.reserve(static_cast<size_t>((2 * radius + 1) * (2 * radius + 1)));
-
-        for (int dy = -radius; dy <= radius; ++dy) {
-            for (int dx = -radius; dx <= radius; ++dx) {
-                const int x = std::clamp(u + dx, 0, w - 1);
-                const int y = std::clamp(v + dy, 0, h - 1);
-                double depth_m = 0.0;
-                if (latest_depth_encoding_ == sensor_msgs::image_encodings::TYPE_16UC1) {
-                    const uint16_t raw = latest_depth_.at<uint16_t>(y, x);
-                    if (raw == 0) {
-                        continue;
-                    }
-                    depth_m = static_cast<double>(raw) * 0.001;  // mm -> m
-                } else if (latest_depth_encoding_ == sensor_msgs::image_encodings::TYPE_32FC1) {
-                    const float raw = latest_depth_.at<float>(y, x);
-                    if (!(raw > 0.0f) || !std::isfinite(raw)) {
-                        continue;
-                    }
-                    depth_m = static_cast<double>(raw);
-                } else {
-                    return std::nullopt;
-                }
-                samples.push_back(depth_m);
+        if (get_parameter("position.depth_sync_stamp").as_bool()) {
+            const double max_delta =
+                get_parameter("position.depth_max_stamp_delta_sec").as_double();
+            const double stamp_delta =
+                std::abs((color_stamp - latest_depth_stamp_).seconds());
+            if (stamp_delta > max_delta) {
+                result.fail_reason = "stamp delta too large";
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 2000,
+                    "Depth/RGB stamp delta %.3fs > %.3fs, skip depth sample",
+                    stamp_delta, max_delta);
+                return result;
             }
         }
 
+        const int depth_w = latest_depth_.cols;
+        const int depth_h = latest_depth_.rows;
+        if (color_w <= 0 || color_h <= 0 || depth_w <= 0 || depth_h <= 0) {
+            result.fail_reason = "invalid image size";
+            return result;
+        }
+
+        if (latest_depth_encoding_ != sensor_msgs::image_encodings::TYPE_16UC1 &&
+            latest_depth_encoding_ != sensor_msgs::image_encodings::TYPE_32FC1) {
+            result.fail_reason = "unsupported depth encoding";
+            return result;
+        }
+
+        const double scale_x = static_cast<double>(depth_w) / static_cast<double>(color_w);
+        const double scale_y = static_cast<double>(depth_h) / static_cast<double>(color_h);
+
+        const double inner_ratio = std::clamp(
+            get_parameter("position.depth_inner_ratio").as_double(), 0.1, 1.0);
+        const float inner_w = std::max(1.0f, bbox_w * static_cast<float>(inner_ratio));
+        const float inner_h = std::max(1.0f, bbox_h * static_cast<float>(inner_ratio));
+
+        const float x0_color = cx - inner_w * 0.5f;
+        const float y0_color = cy - inner_h * 0.5f;
+        result.sample_rect_color = cv::Rect(
+            static_cast<int>(std::floor(x0_color)),
+            static_cast<int>(std::floor(y0_color)),
+            std::max(1, static_cast<int>(std::ceil(inner_w))),
+            std::max(1, static_cast<int>(std::ceil(inner_h))));
+
+        const int x0 = static_cast<int>(std::floor(x0_color * scale_x));
+        const int y0 = static_cast<int>(std::floor(y0_color * scale_y));
+        const int x1 = static_cast<int>(std::ceil((x0_color + inner_w) * scale_x)) - 1;
+        const int y1 = static_cast<int>(std::ceil((y0_color + inner_h) * scale_y)) - 1;
+
+        const int rx0 = std::clamp(x0, 0, depth_w - 1);
+        const int ry0 = std::clamp(y0, 0, depth_h - 1);
+        const int rx1 = std::clamp(x1, 0, depth_w - 1);
+        const int ry1 = std::clamp(y1, 0, depth_h - 1);
+        if (rx1 < rx0 || ry1 < ry0) {
+            result.fail_reason = "bbox outside depth image";
+            return result;
+        }
+
+        const int span_w = rx1 - rx0 + 1;
+        const int span_h = ry1 - ry0 + 1;
+        const int stride = std::max(1, std::min(span_w, span_h) / 7);
+
+        std::vector<double> samples;
+        samples.reserve(static_cast<size_t>(
+            ((span_w + stride - 1) / stride) * ((span_h + stride - 1) / stride)));
+
+        for (int y = ry0; y <= ry1; y += stride) {
+            for (int x = rx0; x <= rx1; x += stride) {
+                double depth_m = 0.0;
+                if (readDepthPixelMeters(x, y, depth_m)) {
+                    samples.push_back(depth_m);
+                }
+            }
+        }
+
+        result.valid_samples = static_cast<int>(samples.size());
         if (samples.empty()) {
-            return std::nullopt;
+            result.fail_reason = "all pixels zero/invalid";
+            return result;
         }
 
         const size_t mid = samples.size() / 2;
-        std::nth_element(samples.begin(), samples.begin() + static_cast<long>(mid), samples.end());
+        std::nth_element(samples.begin(), samples.begin() + static_cast<long>(mid),
+                         samples.end());
         const double depth_m = samples[mid];
 
         const double min_depth = get_parameter("position.depth_min_m").as_double();
         const double max_depth = get_parameter("position.depth_max_m").as_double();
         if (depth_m < min_depth || depth_m > max_depth) {
-            return std::nullopt;
+            result.fail_reason = "depth out of range";
+            return result;
         }
-        return depth_m;
+
+        result.depth_m = depth_m;
+        result.fail_reason.clear();
+        return result;
     }
 
     std::optional<Eigen::Vector3d> estimatePositionCamera(
-        float cx, float cy, float /*bbox_height*/,
-        const rclcpp::Time& color_stamp)
+        float cx, float cy, float bbox_w, float bbox_h,
+        int color_w, int color_h,
+        const rclcpp::Time& color_stamp,
+        DepthSampleResult* depth_debug = nullptr)
     {
         if (!camera_info_received_ || !position_estimator_) {
+            if (depth_debug) {
+                depth_debug->fail_reason = camera_info_received_
+                                               ? "position estimator missing"
+                                               : "no camera_info";
+            }
             return std::nullopt;
         }
 
         Eigen::Vector3d pos_cam;
         if (position_mode_ == "depth") {
-            const int u = static_cast<int>(std::lround(cx));
-            const int v = static_cast<int>(std::lround(cy));
-            const auto depth_m = sampleDepthMeters(u, v, color_stamp);
-            if (!depth_m.has_value()) {
+            auto depth_result = sampleDepthInBBox(
+                cx, cy, bbox_w, bbox_h, color_w, color_h, color_stamp);
+            if (depth_debug) {
+                *depth_debug = depth_result;
+            }
+            if (!depth_result.depth_m.has_value()) {
                 return std::nullopt;
             }
-            if (!position_estimator_->estimateFromDepth(cx, cy, depth_m.value(), pos_cam)) {
+            if (!position_estimator_->estimateFromDepth(
+                    cx, cy, depth_result.depth_m.value(), pos_cam)) {
+                if (depth_debug) {
+                    depth_debug->fail_reason = "back-project failed";
+                }
                 return std::nullopt;
             }
         } else {
@@ -538,7 +638,28 @@ private:
             const double h_ema_alpha = get_parameter("detection.h_ema_alpha").as_double();
             updateBboxHeightEma(static_cast<double>(best_det.height), h_ema_alpha);
 
-            const auto pos_cam_opt = estimatePositionCamera(cx, cy, best_det.height, frame_time);
+            DepthSampleResult depth_result;
+            const auto pos_cam_opt = estimatePositionCamera(
+                cx, cy, best_det.width, best_det.height,
+                frame.cols, frame.rows, frame_time, &depth_result);
+            last_depth_sample_m_ = depth_result.depth_m;
+            last_depth_fail_reason_ = depth_result.fail_reason;
+            last_depth_valid_samples_ = depth_result.valid_samples;
+            last_depth_sample_rect_ = depth_result.sample_rect_color;
+            if (depth_result.depth_m.has_value()) {
+                RCLCPP_INFO_THROTTLE(
+                    get_logger(), *get_clock(), 3000,
+                    "Depth OK: %.2fm (%d px in inner %.0f%% bbox)",
+                    depth_result.depth_m.value(), depth_result.valid_samples,
+                    get_parameter("position.depth_inner_ratio").as_double() * 100.0);
+            } else if (position_mode_ == "depth") {
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 2000,
+                    "Depth failed: %s (%dx%d depth, %dx%d color)",
+                    depth_result.fail_reason.c_str(),
+                    latest_depth_.cols, latest_depth_.rows,
+                    frame.cols, frame.rows);
+            }
             if (pos_cam_opt.has_value()) {
                 std::optional<Eigen::Vector3d> pos_world =
                     transformCameraToWorld(pos_cam_opt.value(), msg->header, frame_time);
@@ -547,13 +668,25 @@ private:
                     frame_has_fresh_detection = true;
                     last_detection_time_valid_ = true;
                     last_detection_time_ = frame_time;
+                    last_measurement_block_reason_.clear();
+                    last_pos_cam_ = pos_cam_opt.value();
+                    last_pos_world_ = pos_world.value();
+                    has_last_pos_world_ = true;
                 } else {
                     fresh_det_block_reason = "TF transform failed";
+                    last_measurement_block_reason_ = fresh_det_block_reason;
+                    last_pos_cam_ = pos_cam_opt.value();
+                    has_last_pos_world_ = false;
                 }
             } else {
                 fresh_det_block_reason =
                     (position_mode_ == "depth") ? "depth sample/estimate failed"
                                                : "bbox depth estimate failed";
+                last_measurement_block_reason_ = fresh_det_block_reason;
+            }
+        } else {
+            if (!ball_found) {
+                last_measurement_block_reason_.clear();
             }
         }
 
@@ -662,11 +795,20 @@ private:
 
         geometry_msgs::msg::PointStamped p_out;
         try {
-            // 等待很短，保证实时性
-            const tf2::Duration timeout = tf2::durationFromSec(0.05);
-            p_out = tf_buffer_->transform(p_in, world_frame_id_, timeout);
+            const tf2::Duration timeout = tf2::durationFromSec(0.1);
+            // static TF + RealSense 时间戳常不一致；用 TimePointZero 取最新外参
+            const geometry_msgs::msg::TransformStamped tf_stamped =
+                tf_buffer_->lookupTransform(
+                    world_frame_id_,
+                    p_in.header.frame_id,
+                    tf2::TimePointZero,
+                    timeout);
+            tf2::doTransform(p_in, p_out, tf_stamped);
         } catch (const tf2::TransformException& ex) {
-            RCLCPP_WARN(get_logger(), "TF transform camera->world failed: %s", ex.what());
+            RCLCPP_WARN(
+                get_logger(),
+                "TF %s -> %s failed: %s",
+                p_in.header.frame_id.c_str(), world_frame_id_.c_str(), ex.what());
             return std::nullopt;
         }
 
@@ -857,6 +999,11 @@ private:
             // Big Red Circle around detected ball
             const int radius = std::max(20, static_cast<int>(best_det->height * 0.8f));
             cv::circle(debug_img, cv::Point(cx, cy), radius, cv::Scalar(0, 0, 255), 4);
+
+            if (position_mode_ == "depth" && last_depth_sample_rect_.area() > 0) {
+                cv::rectangle(debug_img, last_depth_sample_rect_,
+                              cv::Scalar(255, 255, 0), 2);
+            }
         }
 
         // 无目标时也持续显示搜索状态（UI 始终可见）
@@ -882,8 +1029,29 @@ private:
                     cv::FONT_HERSHEY_SIMPLEX, 0.7,
                     cv::Scalar(0, 255, 0), 2);
 
-        // 绘制状态信息（对齐 Python）
         int info_y = 80;
+        if (position_mode_ == "depth") {
+            char stream_buf[160];
+            if (has_latest_depth_ && !latest_depth_.empty()) {
+                std::snprintf(stream_buf, sizeof(stream_buf),
+                              "Depth stream: %dx%d (%s) #%llu",
+                              latest_depth_.cols, latest_depth_.rows,
+                              latest_depth_encoding_.c_str(),
+                              static_cast<unsigned long long>(depth_frames_received_));
+                cv::putText(debug_img, stream_buf, cv::Point(10, info_y),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.55,
+                            cv::Scalar(0, 255, 0), 2);
+            } else {
+                cv::putText(debug_img,
+                            "Depth stream: NO DATA (check RealSense depth)",
+                            cv::Point(10, info_y),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.55,
+                            cv::Scalar(0, 0, 255), 2);
+            }
+            info_y += 22;
+        }
+
+        // 绘制状态信息（对齐 Python）
         cv::putText(debug_img,
                     "Detections: " + std::to_string(detections.size()),
                     cv::Point(10, info_y),
@@ -904,16 +1072,64 @@ private:
                         cv::Point(10, info_y),
                         cv::FONT_HERSHEY_SIMPLEX, 0.6,
                         cv::Scalar(0, 0, 255), 2);
+            if (!last_measurement_block_reason_.empty()) {
+                info_y += 22;
+                cv::putText(debug_img,
+                            "KF block: " + last_measurement_block_reason_,
+                            cv::Point(10, info_y),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                            cv::Scalar(0, 128, 255), 2);
+            }
         }
         info_y += 25;
 
-        // Current Z Depth / Height in world frame (from KF state z)
+        if (position_mode_ == "depth" && last_pos_cam_.has_value()) {
+            char cam_buf[128];
+            std::snprintf(cam_buf, sizeof(cam_buf),
+                          "Cam XYZ: %.2f %.2f %.2f m",
+                          last_pos_cam_->x(), last_pos_cam_->y(), last_pos_cam_->z());
+            cv::putText(debug_img, cam_buf, cv::Point(10, info_y),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.55,
+                        cv::Scalar(200, 200, 255), 2);
+            info_y += 22;
+        }
+
+        if (position_mode_ == "depth") {
+            char depth_buf[128];
+            if (last_depth_sample_m_.has_value()) {
+                std::snprintf(depth_buf, sizeof(depth_buf),
+                              "Depth@ball: %.2f m (%d px)",
+                              last_depth_sample_m_.value(), last_depth_valid_samples_);
+                cv::putText(debug_img, depth_buf, cv::Point(10, info_y),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.6,
+                            cv::Scalar(0, 255, 255), 2);
+            } else {
+                std::snprintf(depth_buf, sizeof(depth_buf),
+                              "Depth@ball: FAIL (%s)",
+                              last_depth_fail_reason_.empty()
+                                  ? "no sample"
+                                  : last_depth_fail_reason_.c_str());
+                cv::putText(debug_img, depth_buf, cv::Point(10, info_y),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.55,
+                            cv::Scalar(0, 128, 255), 2);
+            }
+            info_y += 25;
+        }
+
         double current_z = 0.0;
         if (ball_tracker_->isInitialized()) {
             current_z = ball_tracker_->getPosition().z();
         }
         char zbuf[96];
-        std::snprintf(zbuf, sizeof(zbuf), "Current Z Depth: %.3f m", current_z);
+        if (ball_tracker_->isInitialized()) {
+            std::snprintf(zbuf, sizeof(zbuf), "World Z (KF odom): %.3f m", current_z);
+        } else if (has_last_pos_world_) {
+            std::snprintf(zbuf, sizeof(zbuf),
+                          "World Z: KF off (meas %.2f m)",
+                          last_pos_world_.z());
+        } else {
+            std::snprintf(zbuf, sizeof(zbuf), "World Z (KF): -- (未激活)");
+        }
         cv::putText(debug_img,
                     zbuf,
                     cv::Point(10, info_y),
@@ -981,6 +1197,18 @@ private:
     std::string latest_depth_encoding_;
     rclcpp::Time latest_depth_stamp_{0, 0, RCL_ROS_TIME};
     bool has_latest_depth_{false};
+    uint64_t depth_frames_received_{0};
+    bool depth_first_frame_logged_{false};
+
+    std::optional<double> last_depth_sample_m_;
+    std::string last_depth_fail_reason_;
+    int last_depth_valid_samples_{0};
+    cv::Rect last_depth_sample_rect_;
+
+    std::string last_measurement_block_reason_;
+    std::optional<Eigen::Vector3d> last_pos_cam_;
+    Eigen::Vector3d last_pos_world_{0.0, 0.0, 0.0};
+    bool has_last_pos_world_{false};
 };
 
 int main(int argc, char** argv)
