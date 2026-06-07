@@ -83,6 +83,8 @@ def _setup(context, *args, **kwargs):
         )
         nodes = [static_tf, video_pub, ball_detector]
     else:
+        # 必须挂到 camera_link：RealSense 已发布 camera_link→…→camera_color_optical_frame，
+        # 若 odom 直连 camera_color_optical_frame 会造成 TF 两棵树，KF 永远拿不到 world 测量。
         static_tf = Node(
             package="tf2_ros",
             executable="static_transform_publisher",
@@ -92,7 +94,7 @@ def _setup(context, *args, **kwargs):
                 "--x", "0", "--y", "0", "--z", "1.0",
                 "--yaw", "0", "--pitch", "0", "--roll", "0",
                 "--frame-id", "odom",
-                "--child-frame-id", "camera_color_optical_frame",
+                "--child-frame-id", "camera_link",
             ],
         )
         realsense = Node(

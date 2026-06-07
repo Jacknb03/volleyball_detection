@@ -672,6 +672,14 @@ private:
                     last_pos_cam_ = pos_cam_opt.value();
                     last_pos_world_ = pos_world.value();
                     has_last_pos_world_ = true;
+                    if (!tf_success_logged_) {
+                        tf_success_logged_ = true;
+                        RCLCPP_INFO(
+                            get_logger(),
+                            "TF OK -> %s, world meas [%.2f, %.2f, %.2f]",
+                            world_frame_id_.c_str(),
+                            pos_world->x(), pos_world->y(), pos_world->z());
+                    }
                 } else {
                     fresh_det_block_reason = "TF transform failed";
                     last_measurement_block_reason_ = fresh_det_block_reason;
@@ -1199,6 +1207,7 @@ private:
     bool has_latest_depth_{false};
     uint64_t depth_frames_received_{0};
     bool depth_first_frame_logged_{false};
+    bool tf_success_logged_{false};
 
     std::optional<double> last_depth_sample_m_;
     std::string last_depth_fail_reason_;

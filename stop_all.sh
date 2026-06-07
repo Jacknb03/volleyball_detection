@@ -15,6 +15,7 @@ PATTERNS=(
   'realsense2_camera_node'
   'static_transform_publisher.*--frame-id odom --child-frame-id camera_optical_frame'
   'static_transform_publisher.*--frame-id odom --child-frame-id camera_color_optical_frame'
+  'static_transform_publisher.*--frame-id odom --child-frame-id camera_link'
   'rviz2 -d.*volleyball_debug\.rviz'
 )
 

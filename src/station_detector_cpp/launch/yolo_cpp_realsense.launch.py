@@ -33,8 +33,7 @@ def generate_launch_description():
     model_path_arg = DeclareLaunchArgument("model_path", default_value=default_model)
     yolo_device_arg = DeclareLaunchArgument("yolo_device", default_value="auto")
 
-    # Placeholder: camera 1 m above odom origin, facing forward.
-    # Replace with your robot's camera extrinsics when integrated.
+    # odom → camera_link（勿直连 camera_color_optical_frame，会与 RealSense 内置 TF 冲突）
     static_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
@@ -44,7 +43,7 @@ def generate_launch_description():
             "--x", "0", "--y", "0", "--z", "1.0",
             "--yaw", "0", "--pitch", "0", "--roll", "0",
             "--frame-id", "odom",
-            "--child-frame-id", "camera_color_optical_frame",
+            "--child-frame-id", "camera_link",
         ],
     )
 
