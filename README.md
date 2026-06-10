@@ -57,7 +57,7 @@ flowchart LR
 
 ## 方法论与数学模型
 
-> 公式使用 GitHub 支持的 `$...$` / `$$...$$` 语法。若在 Cursor/本地预览仍不渲染，推到 GitHub 网页查看即可。
+> 公式使用 GitHub 支持的 `$...$` / `$$...$$` 语法。
 
 整条链路可以写成：**像素观测 → 3D 测量 → 世界系滤波 → 物理外推**。下面按代码实际实现写（与 `trajectory_predictor.cpp`、`ball_tracker.cpp` 一致）。
 
