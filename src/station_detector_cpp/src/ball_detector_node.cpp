@@ -8,6 +8,8 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 
+#include <station_detector_cpp/msg/volleyball_intercept.hpp>
+
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 
@@ -89,6 +91,8 @@ public:
         declare_parameter<double>("trajectory.integration_dt", 0.01);
         declare_parameter<double>("trajectory.max_time", 5.0);
         declare_parameter<double>("trajectory.ground_z", 0.0);
+        declare_parameter<double>("trajectory.intercept_z", 1.0);
+        declare_parameter<std::string>("trajectory.intercept_crossing", "descending");
 
         declare_parameter<bool>("debug.enable", true);
         declare_parameter<bool>("debug.show_fps", true);
@@ -193,6 +197,9 @@ public:
             "/ball_state", 10);
         ball_prediction_pub_ = create_publisher<geometry_msgs::msg::Point>(
             "/ball_prediction", 10);
+
+        intercept_pub_ = create_publisher<station_detector_cpp::msg::VolleyballIntercept>(
+            "/ball_intercept", 10);
 
         last_frame_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
         last_detection_time_valid_ = false;
@@ -750,7 +757,7 @@ private:
 
             // /volleyball_pose（world frame）
             geometry_msgs::msg::PoseStamped pose;
-            pose.header = msg->header;
+            pose.header.stamp = frame_time;
             pose.header.frame_id = world_frame_id_;
             pose.pose.position.x = pos_world.x();
             pose.pose.position.y = pos_world.y();
@@ -763,8 +770,7 @@ private:
 
             publishBallState(pos_world, vel_world);
 
-            // 预测并发布 marker（world frame）
-            publishWorldTrajectory(msg->header, pos_world, vel_world);
+            publishWorldTrajectory(frame_time, pos_world, vel_world);
         }
 
         // 9) 生成并发布调试图像（对齐 Python: 用 volleyball_detections + best + kalman_state）
@@ -875,6 +881,43 @@ private:
         ball_state_pub_->publish(msg);
     }
 
+    static builtin_interfaces::msg::Time toMsgTime(const rclcpp::Time& t)
+    {
+        builtin_interfaces::msg::Time out;
+        const int64_t ns = t.nanoseconds();
+        out.sec = static_cast<int32_t>(ns / 1000000000LL);
+        out.nanosec = static_cast<uint32_t>(ns % 1000000000LL);
+        return out;
+    }
+
+    void publishBallIntercept(const rclcpp::Time& obs_time,
+                              const Eigen::Vector3d& pos_world,
+                              const Eigen::Vector3d& vel_world,
+                              const Eigen::Vector3d& intercept_pos,
+                              double time_to_event,
+                              double intercept_z,
+                              bool valid)
+    {
+        station_detector_cpp::msg::VolleyballIntercept msg;
+        msg.header.stamp = toMsgTime(obs_time);
+        msg.header.frame_id = world_frame_id_;
+        msg.position.x = intercept_pos.x();
+        msg.position.y = intercept_pos.y();
+        msg.position.z = intercept_pos.z();
+        msg.velocity.x = vel_world.x();
+        msg.velocity.y = vel_world.y();
+        msg.velocity.z = vel_world.z();
+        msg.time_to_event = time_to_event;
+        msg.event_time = toMsgTime(obs_time + rclcpp::Duration::from_seconds(time_to_event));
+        msg.intercept_z = intercept_z;
+        msg.valid = valid;
+        intercept_pub_->publish(msg);
+
+        last_intercept_valid_ = valid;
+        last_time_to_event_ = time_to_event;
+        last_intercept_pos_ = intercept_pos;
+    }
+
     void publishBallPrediction(const Eigen::Vector3d& landing_pos,
                                double time_to_land)
     {
@@ -886,7 +929,7 @@ private:
         ball_prediction_pub_->publish(msg);
     }
 
-    void publishWorldTrajectory(const std_msgs::msg::Header& header,
+    void publishWorldTrajectory(const rclcpp::Time& obs_time,
                                  const Eigen::Vector3d& pos_world,
                                  const Eigen::Vector3d& vel_world)
     {
@@ -894,21 +937,47 @@ private:
             return;
         }
 
-        double t_land = 0.0;
-        Eigen::Vector3d landing_pos(0.0, 0.0, 0.0);
+        const double intercept_z = get_parameter("trajectory.intercept_z").as_double();
+        const std::string crossing =
+            get_parameter("trajectory.intercept_crossing").as_string();
+
+        double t_event = 0.0;
+        Eigen::Vector3d intercept_pos(0.0, 0.0, intercept_z);
         std::vector<Eigen::Vector3d> path_points;
 
-        if (!trajectory_predictor_->predictLanding(pos_world, vel_world, t_land, landing_pos, path_points)) {
+        const bool intercept_ok = trajectory_predictor_->predictAtZ(
+            pos_world, vel_world, intercept_z, crossing,
+            t_event, intercept_pos, path_points);
+
+        publishBallIntercept(obs_time, pos_world, vel_world,
+                             intercept_pos, t_event, intercept_z, intercept_ok);
+
+        if (intercept_ok) {
+            publishBallPrediction(intercept_pos, t_event);
+        } else {
+            double t_land = 0.0;
+            Eigen::Vector3d landing_pos(0.0, 0.0, 0.0);
+            std::vector<Eigen::Vector3d> ground_path;
+            if (trajectory_predictor_->predictLanding(
+                    pos_world, vel_world, t_land, landing_pos, ground_path)) {
+                publishBallPrediction(landing_pos, t_land);
+                if (path_points.empty()) {
+                    path_points = std::move(ground_path);
+                }
+            }
+        }
+
+        if (path_points.empty()) {
             return;
         }
 
-        publishBallPrediction(landing_pos, t_land);
+        const builtin_interfaces::msg::Time viz_stamp = toMsgTime(obs_time);
 
         // world marker
         visualization_msgs::msg::MarkerArray array;
 
         visualization_msgs::msg::Marker line;
-        line.header.stamp = header.stamp;
+        line.header.stamp = viz_stamp;
         line.header.frame_id = world_frame_id_;
         line.ns = "volleyball_trajectory";
         line.id = 0;
@@ -930,9 +999,9 @@ private:
         }
 
         visualization_msgs::msg::Marker sphere;
-        sphere.header.stamp = header.stamp;
+        sphere.header.stamp = viz_stamp;
         sphere.header.frame_id = world_frame_id_;
-        sphere.ns = "volleyball_landing";
+        sphere.ns = "volleyball_intercept";
         sphere.id = 1;
         sphere.type = visualization_msgs::msg::Marker::SPHERE;
         sphere.action = visualization_msgs::msg::Marker::ADD;
@@ -952,9 +1021,10 @@ private:
         sphere.color.a = 1.0f;
 
         sphere.pose.orientation.w = 1.0;
-        sphere.pose.position.x = landing_pos.x();
-        sphere.pose.position.y = landing_pos.y();
-        sphere.pose.position.z = landing_pos.z();
+        const Eigen::Vector3d& marker_pos = intercept_ok ? intercept_pos : path_points.back();
+        sphere.pose.position.x = marker_pos.x();
+        sphere.pose.position.y = marker_pos.y();
+        sphere.pose.position.z = marker_pos.z();
 
         array.markers.push_back(line);
         array.markers.push_back(sphere);
@@ -1145,6 +1215,18 @@ private:
                     cv::Scalar(255, 255, 255), 2);
         info_y += 25;
 
+        if (last_intercept_valid_) {
+            char intercept_buf[160];
+            std::snprintf(intercept_buf, sizeof(intercept_buf),
+                          "Intercept: (%.2f,%.2f) z=%.2f in %.2fs",
+                          last_intercept_pos_.x(), last_intercept_pos_.y(),
+                          last_intercept_pos_.z(), last_time_to_event_);
+            cv::putText(debug_img, intercept_buf, cv::Point(10, info_y),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.55,
+                        cv::Scalar(0, 255, 128), 2);
+            info_y += 22;
+        }
+
         // 始终显示 FPS，避免无检测时 UI 消失
         double fps = 0.0;
         if (last_detection_time_valid_) {
@@ -1187,6 +1269,7 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr debug_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ball_state_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ball_prediction_pub_;
+    rclcpp::Publisher<station_detector_cpp::msg::VolleyballIntercept>::SharedPtr intercept_pub_;
 
     rclcpp::Time last_frame_time_;
     rclcpp::Time last_detection_time_;
@@ -1218,6 +1301,10 @@ private:
     std::optional<Eigen::Vector3d> last_pos_cam_;
     Eigen::Vector3d last_pos_world_{0.0, 0.0, 0.0};
     bool has_last_pos_world_{false};
+
+    bool last_intercept_valid_{false};
+    double last_time_to_event_{0.0};
+    Eigen::Vector3d last_intercept_pos_{0.0, 0.0, 0.0};
 };
 
 int main(int argc, char** argv)

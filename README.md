@@ -38,7 +38,7 @@ flowchart LR
   BBOX --> TF
   DEPTH --> TF
   TF --> KF --> PHY
-  PHY --> OUT["volleyball_pose / ball_prediction"]
+  PHY --> OUT["volleyball_pose / ball_intercept"]
 ```
 
 ### 实现思路（概要）
@@ -269,24 +269,26 @@ $$
 2. $\mathbf{v}_{n+1} = \mathbf{v}_n + \mathbf{a}_n\,\Delta t$
 3. $\mathbf{x}_{n+1} = \mathbf{x}_n + \mathbf{v}_{n+1}\,\Delta t$
 
-循环直到 $z \le$ `trajectory.ground_z`，落地时刻与位置对最后一步做**线性插值**。
+循环直到轨迹**首次穿过** `trajectory.intercept_z`（击球高度；`intercept_crossing` 控制方向），对穿越时刻做**线性插值**。拦截失败时回退到 `ground_z` 地面落点。
 
 ```mermaid
 flowchart LR
   IN["KF 输出\n(x0, v0)"] --> LOOP["每步 dt=0.01s\na = g - k|v|v\nv += a dt\nx += v dt"]
-  LOOP --> CHECK{z <= ground_z?}
+  LOOP --> CHECK{z 穿过 intercept_z?}
   CHECK -->|否| LOOP
-  CHECK -->|是| LAND["插值得落点\n/ball_prediction"]
+  CHECK -->|是| EVT["插值得拦截点\n/ball_intercept"]
   LOOP --> PATH["路径点\n/volleyball_trajectory"]
 ```
 
 **与无阻力抛物线的区别**：无阻力时 $x(t), y(t)$ 线性、$z(t)$ 二次；有阻力时三轴都非线性，且水平速度也会衰减（$v_x, v_y$ 被 drag 拉低）。
 
-**输出**：
-- `/volleyball_trajectory`：离散路径点（RViz 抛物线）
-- `/ball_prediction`：落点 $(x,y)$ + 落地时间 $t$ 写在 `z` 字段
+**输出**（完整字段见下表 §输出话题）：
+- **`/ball_intercept`**：给小车规划用（位置 + 相对/绝对到达时间 + 速度）
+- `/volleyball_trajectory`：RViz 抛物线
+- `/ball_prediction`：兼容旧下游（无 header；优先拦截点，失败才地面落点）
 
 **调参直觉**：
+- 击球高度 → `trajectory.intercept_z`
 - 落点偏远、弧太「抛」→ **增大** `drag_coefficient`
 - 3D 深度系统性偏差 → 调 `volleyball.diameter`（bbox）或检查 depth 量程
 - 轨迹抖 → 先调 KF（`measurement_noise`、`h_ema_alpha`），再调阻力
@@ -342,7 +344,7 @@ sequenceDiagram
   KF->>Phy: x, v
   Phy->>Phy: 积分 g + drag
   KF->>ROS: /volleyball_pose
-  Phy->>ROS: /volleyball_trajectory, /ball_prediction
+  Phy->>ROS: /volleyball_trajectory, /ball_intercept
   YOLO->>ROS: /debug_image
 ```
 
@@ -454,13 +456,28 @@ VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 
 ## 输出话题
 
-| 话题 | 类型 | 说明 |
-|------|------|------|
-| `/debug_image` | `sensor_msgs/Image` | 带检测框，RViz 看这个 |
-| `/volleyball_pose` | `geometry_msgs/PoseStamped` | KF 滤波后 3D 位姿 |
-| `/volleyball_trajectory` | `visualization_msgs/MarkerArray` | 预测抛物线 |
-| `/ball_prediction` | `geometry_msgs/Point` | 落点 $(x,y)$，`z` 为落地时间 $t$ |
-| `/ball_state` | `geometry_msgs/Point` | 内部状态调试（可选） |
+> **`.msg` 文件**（如 `msg/VolleyballIntercept.msg`）是 ROS2 **消息类型定义**，编译进代码，供 `ros2 topic echo` 和小车订阅——**不是** Markdown 文档，也不能删掉。  
+> 字段含义以本表为准；调参见 [readme.md](src/station_detector_cpp/readme.md)。
+
+| 话题 | 类型 | 下游用途 |
+|------|------|----------|
+| **`/ball_intercept`** | `station_detector_cpp/VolleyballIntercept` | **主输出**：拦截点、球速、`time_to_event`、`event_time`（小车规划用） |
+| `/volleyball_pose` | `geometry_msgs/PoseStamped` | KF 滤波后当前 3D 位姿 |
+| `/volleyball_trajectory` | `visualization_msgs/MarkerArray` | RViz 预测轨迹 |
+| `/debug_image` | `sensor_msgs/Image` | 检测框与状态叠加 |
+| `/ball_prediction` | `geometry_msgs/Point` | **兼容**：x,y=拦截点，z=Δt；无 header，新工程请用 `/ball_intercept` |
+| `/ball_state` | `geometry_msgs/Point` | 调试：当前位置 |
+
+**yaml 拦截高度**（`ball_detector_params_*.yaml`）：
+
+```yaml
+trajectory:
+  intercept_z: 1.0              # 击球机构高度 [m]，world Z
+  intercept_crossing: descending  # descending | ascending | next
+  ground_z: 0.0                 # 拦截失败时回退地面
+```
+
+小车侧：`剩余时间 ≈ event_time - now()`，目标 `(position.x, position.y)`。
 
 ---
 
@@ -484,7 +501,7 @@ VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 2. 替换占位 static TF → 机器人 URDF / 标定
 3. 定比赛主控：**Jetson** 或 **1260P 工控机**（见 DEPLOYMENT §五）+ 无显卡则 **YOLOv8n 小模型**（§六）
 4. fps 优化：OpenVINO / 跳帧 ROI（可选，当前 PC CUDA 约 6–8 Hz pose）
-5. 下游机构（EtherCAT 控制机）对接 `/volleyball_pose`
+5. 下游机构（EtherCAT 控制机）对接 **`/ball_intercept`**（或兼容 `/ball_prediction`）
 
 建议：**先 D455i 有球实测 → 与队友定单机/双机架构 → 再训小模型上 1260P。**
 
@@ -502,7 +519,7 @@ VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 | ONNX 模型 | 拷贝 `best.onnx` | 同左 | 同左（小模型需重训，见 DEPLOYMENT §6.2） |
 | RealSense | `install_realsense_deps.sh` | 板子上再跑 | 同左 |
 | TensorRT engine | 4060 的 **不能** 给 Jetson | Jetson 本机转 | 无 NVIDIA 则不用 |
-| 与机构通信 | — | 订阅 `/volleyball_pose` | 常作控制机；视觉可另设专机 |
+| 与机构通信 | — | 订阅 `/ball_intercept` | 常作控制机；视觉可另设专机 |
 
 **不用重写的**：算法、YAML、launch、`/volleyball_pose` 话题接口。  
 **必须重做的**：编译、推理后端、相机驱动、真实 TF、与队友对齐 EtherCAT/颠球时序。

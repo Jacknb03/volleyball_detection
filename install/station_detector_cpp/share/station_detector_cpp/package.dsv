@@ -1,6 +1,9 @@
 source;share/station_detector_cpp/hook/cmake_prefix_path.ps1
 source;share/station_detector_cpp/hook/cmake_prefix_path.dsv
 source;share/station_detector_cpp/hook/cmake_prefix_path.sh
+source;share/station_detector_cpp/hook/ld_library_path_lib.ps1
+source;share/station_detector_cpp/hook/ld_library_path_lib.dsv
+source;share/station_detector_cpp/hook/ld_library_path_lib.sh
 source;share/station_detector_cpp/local_setup.bash
 source;share/station_detector_cpp/local_setup.dsv
 source;share/station_detector_cpp/local_setup.ps1

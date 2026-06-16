@@ -123,14 +123,14 @@ ros2 topic echo /volleyball_pose --once
 - 有框但 `KF: Not initialized` → TF 失败或 3D 估计失败（看终端 `PARADOX` / `TF transform failed`）
 - **视频循环后轨迹消失** → 已修复自动 reset；若仍出现，检查 `max_physical_speed`
 
-### [4] 落点 / 轨迹有没有？
+### [4] 拦截预测 / 轨迹有没有？
 
 ```bash
 ros2 topic hz /volleyball_trajectory
-ros2 topic echo /ball_prediction
+ros2 topic echo /ball_intercept
 ```
 
-RViz 中应看到橙色抛物线和绿色落点球。
+RViz 中应看到橙色抛物线和绿色拦截点球；debug 画面有 `Intercept: ... in X.XXs`。
 
 ### [5] 够不够快？
 
@@ -170,7 +170,7 @@ ros2 launch station_detector_cpp yolo.launch.py \
 ros2 node list
 ros2 topic list
 ros2 topic hz /volleyball_pose
-ros2 topic echo /ball_prediction
+ros2 topic echo /ball_intercept
 ```
 
 ---

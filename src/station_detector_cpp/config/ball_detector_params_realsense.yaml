@@ -49,6 +49,8 @@ ball_detector_node:
       integration_dt: 0.01
       max_time: 5.0
       ground_z: 0.0
+      intercept_z: 1.0                # 击球高度 [m]，详见 README §输出话题
+      intercept_crossing: "descending"
 
     world_frame_id: "odom"
     camera_frame_id: "camera_color_optical_frame"

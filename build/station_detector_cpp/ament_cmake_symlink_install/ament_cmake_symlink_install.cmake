@@ -315,8 +315,62 @@ message(STATUS "Execute custom install script")
 
 # begin of custom install code
 
-# install("TARGETS" "ball_detector_node" "DESTINATION" "lib/station_detector_cpp")
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_index/share/ament_index/resource_index/rosidl_interfaces/station_detector_cpp" "DESTINATION" "share/ament_index/resource_index/rosidl_interfaces")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_index/share/ament_index/resource_index/rosidl_interfaces/station_detector_cpp" "DESTINATION" "share/ament_index/resource_index/rosidl_interfaces")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_generator_c/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.h")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_generator_c/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.h")
+
+# install(FILES "/opt/ros/humble/lib/python3.10/site-packages/ament_package/template/environment_hook/library_path.sh" "DESTINATION" "share/station_detector_cpp/environment")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/opt/ros/humble/lib/python3.10/site-packages/ament_package/template/environment_hook/library_path.sh" "DESTINATION" "share/station_detector_cpp/environment")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_environment_hooks/library_path.dsv" "DESTINATION" "share/station_detector_cpp/environment")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_environment_hooks/library_path.dsv" "DESTINATION" "share/station_detector_cpp/environment")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_fastrtps_c/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN_EXCLUDE" "*.cpp")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_fastrtps_c/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN_EXCLUDE" "*.cpp")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_generator_cpp/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.hpp")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_generator_cpp/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.hpp")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_fastrtps_cpp/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN_EXCLUDE" "*.cpp")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_fastrtps_cpp/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN_EXCLUDE" "*.cpp")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_introspection_c/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.h")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_introspection_c/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.h")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_introspection_cpp/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.hpp")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_typesupport_introspection_cpp/station_detector_cpp/" "DESTINATION" "include/station_detector_cpp/station_detector_cpp" "PATTERN" "*.hpp")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_environment_hooks/pythonpath.sh" "DESTINATION" "share/station_detector_cpp/environment")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_environment_hooks/pythonpath.sh" "DESTINATION" "share/station_detector_cpp/environment")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_environment_hooks/pythonpath.dsv" "DESTINATION" "share/station_detector_cpp/environment")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_environment_hooks/pythonpath.dsv" "DESTINATION" "share/station_detector_cpp/environment")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_python/station_detector_cpp/station_detector_cpp.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp-0.1.0-py3.10.egg-info")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_python/station_detector_cpp/station_detector_cpp.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp-0.1.0-py3.10.egg-info")
+
+# install(DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_generator_py/station_detector_cpp/" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
+ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_generator_py/station_detector_cpp/" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
+
+# install("TARGETS" "station_detector_cpp__rosidl_typesupport_fastrtps_c__pyext" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp")
 include("/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_symlink_install_targets_0_${CMAKE_INSTALL_CONFIG_NAME}.cmake")
+
+# install("TARGETS" "station_detector_cpp__rosidl_typesupport_introspection_c__pyext" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp")
+include("/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_symlink_install_targets_1_${CMAKE_INSTALL_CONFIG_NAME}.cmake")
+
+# install("TARGETS" "station_detector_cpp__rosidl_typesupport_c__pyext" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp")
+include("/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_symlink_install_targets_2_${CMAKE_INSTALL_CONFIG_NAME}.cmake")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_adapter/station_detector_cpp/msg/VolleyballIntercept.idl" "DESTINATION" "share/station_detector_cpp/msg")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_adapter/station_detector_cpp/msg/VolleyballIntercept.idl" "DESTINATION" "share/station_detector_cpp/msg")
+
+# install(FILES "/home/song/volleyball_detection/src/station_detector_cpp/msg/VolleyballIntercept.msg" "DESTINATION" "share/station_detector_cpp/msg")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/src/station_detector_cpp/msg/VolleyballIntercept.msg" "DESTINATION" "share/station_detector_cpp/msg")
+
+# install("TARGETS" "ball_detector_node" "DESTINATION" "lib/station_detector_cpp")
+include("/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_symlink_install_targets_3_${CMAKE_INSTALL_CONFIG_NAME}.cmake")
 
 # install(DIRECTORY "include/" "DESTINATION" "include")
 ament_cmake_symlink_install_directory("/home/song/volleyball_detection/src/station_detector_cpp" DIRECTORY "include/" "DESTINATION" "include")
@@ -368,6 +422,27 @@ ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_d
 
 # install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_index/share/ament_index/resource_index/packages/station_detector_cpp" "DESTINATION" "share/ament_index/resource_index/packages")
 ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_index/share/ament_index/resource_index/packages/station_detector_cpp" "DESTINATION" "share/ament_index/resource_index/packages")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_cmake/rosidl_cmake-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_cmake/rosidl_cmake-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_dependencies/ament_cmake_export_dependencies-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_dependencies/ament_cmake_export_dependencies-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_include_directories/ament_cmake_export_include_directories-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_include_directories/ament_cmake_export_include_directories-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_libraries/ament_cmake_export_libraries-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_libraries/ament_cmake_export_libraries-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_targets/ament_cmake_export_targets-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_export_targets/ament_cmake_export_targets-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_cmake/rosidl_cmake_export_typesupport_targets-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_cmake/rosidl_cmake_export_typesupport_targets-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+
+# install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
+ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
 
 # install(FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_core/station_detector_cppConfig.cmake" "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_core/station_detector_cppConfig-version.cmake" "DESTINATION" "share/station_detector_cpp/cmake")
 ament_cmake_symlink_install_files("/home/song/volleyball_detection/src/station_detector_cpp" FILES "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_core/station_detector_cppConfig.cmake" "/home/song/volleyball_detection/build/station_detector_cpp/ament_cmake_core/station_detector_cppConfig-version.cmake" "DESTINATION" "share/station_detector_cpp/cmake")

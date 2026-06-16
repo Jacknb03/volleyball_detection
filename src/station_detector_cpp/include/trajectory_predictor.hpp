@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <string>
 #include <vector>
 
 /**
@@ -51,6 +52,18 @@ public:
                          double& time_to_land,
                          Eigen::Vector3d& landing_pos,
                          std::vector<Eigen::Vector3d>& path_points) const;
+
+    /**
+     * 预测球轨迹首次穿过 target_z 平面的时刻与位置。
+     * @param crossing  "next" | "descending" | "ascending"
+     */
+    bool predictAtZ(const Eigen::Vector3d& pos,
+                    const Eigen::Vector3d& vel,
+                    double target_z,
+                    const std::string& crossing,
+                    double& time_to_event,
+                    Eigen::Vector3d& event_pos,
+                    std::vector<Eigen::Vector3d>& path_points) const;
 
 private:
     double g_;             // 重力加速度

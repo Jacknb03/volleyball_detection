@@ -1,8 +1,9 @@
 # 参数调优手册
 
-> **数学模型与公式**（KF 矩阵、阻力积分、数据流图）：见仓库根目录 [README.md](../../README.md#方法论与数学模型)  
-> 硬件部署 / CUDA / RealSense / **1260P·EtherCAT** / **无显卡优化**：见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)（§五–§六）  
-> 从零调试：见 [docs/DEBUGGING.md](docs/DEBUGGING.md)
+> **输出话题**（`/ball_intercept` 等）：见 [README.md §输出话题](../../README.md#输出话题)  
+> **数学模型**：见 [README.md §方法论](../../README.md#方法论与数学模型)  
+> 部署 / 1260P：见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · 调试：[docs/DEBUGGING.md](docs/DEBUGGING.md)  
+> `msg/*.msg` 是 ROS 接口定义（编译用），不是文档。
 
 ## 核心链路
 
@@ -11,7 +12,7 @@
 3. **Estimator** — bbox 估深 或 深度图采样 → 3D  
 4. **TF** — 相机系 → `odom`  
 5. **Kalman** — 6 状态 CV 模型，平滑 + 速度（见 `ball_tracker.cpp`）  
-6. **Predictor** — 重力 + 二次阻力 → 落点（见 `trajectory_predictor.cpp`）  
+6. **Predictor** — 重力 + 二次阻力 → 穿过 `intercept_z` 的拦截点（见 `trajectory_predictor.cpp`）  
 
 ---
 
@@ -83,7 +84,9 @@
 | `air_density` | 1.225 | 室内一般不动 |
 | `volleyball.mass_kg` | 0.27 | 一般不动 |
 | `trajectory.integration_dt` | 0.01 | 一般不动 |
-| `trajectory.ground_z` | 0.0 | 地面高度 |
+| `trajectory.intercept_z` | 1.0 | **击球机构高度** [m]（world Z） |
+| `trajectory.intercept_crossing` | descending | 下落穿过 intercept_z；见 yaml 注释 |
+| `trajectory.ground_z` | 0.0 | 地面高度（拦截失败回退） |
 
 ---
 

@@ -184,6 +184,7 @@ ball_detector_node: /opt/ros/humble/lib/libstatic_transform_broadcaster_node.so
 ball_detector_node: /usr/local/lib/libopencv_dnn.so.4.11.0
 ball_detector_node: /usr/local/lib/libopencv_highgui.so.4.11.0
 ball_detector_node: /usr/local/lib/libopencv_videoio.so.4.11.0
+ball_detector_node: libstation_detector_cpp__rosidl_typesupport_cpp.so
 ball_detector_node: /opt/ros/humble/lib/libvisualization_msgs__rosidl_typesupport_c.so
 ball_detector_node: /opt/ros/humble/lib/libvisualization_msgs__rosidl_generator_c.so
 ball_detector_node: /opt/ros/humble/lib/libsensor_msgs__rosidl_typesupport_fastrtps_c.so
@@ -264,12 +265,8 @@ ball_detector_node: /opt/ros/humble/lib/libunique_identifier_msgs__rosidl_typesu
 ball_detector_node: /opt/ros/humble/lib/librosidl_typesupport_introspection_cpp.so
 ball_detector_node: /opt/ros/humble/lib/librosidl_typesupport_introspection_c.so
 ball_detector_node: /opt/ros/humble/lib/libtf2_msgs__rosidl_typesupport_cpp.so
-ball_detector_node: /opt/ros/humble/lib/libgeometry_msgs__rosidl_typesupport_cpp.so
-ball_detector_node: /opt/ros/humble/lib/libstd_msgs__rosidl_typesupport_cpp.so
 ball_detector_node: /opt/ros/humble/lib/libaction_msgs__rosidl_typesupport_cpp.so
-ball_detector_node: /opt/ros/humble/lib/libbuiltin_interfaces__rosidl_typesupport_cpp.so
 ball_detector_node: /opt/ros/humble/lib/libunique_identifier_msgs__rosidl_typesupport_cpp.so
-ball_detector_node: /opt/ros/humble/lib/librosidl_typesupport_cpp.so
 ball_detector_node: /opt/ros/humble/lib/libtf2_msgs__rosidl_generator_py.so
 ball_detector_node: /opt/ros/humble/lib/libgeometry_msgs__rosidl_generator_py.so
 ball_detector_node: /opt/ros/humble/lib/libstd_msgs__rosidl_generator_py.so
@@ -288,16 +285,20 @@ ball_detector_node: /opt/ros/humble/lib/libbuiltin_interfaces__rosidl_generator_
 ball_detector_node: /opt/ros/humble/lib/libunique_identifier_msgs__rosidl_generator_py.so
 ball_detector_node: /usr/lib/x86_64-linux-gnu/libpython3.10.so
 ball_detector_node: /opt/ros/humble/lib/libunique_identifier_msgs__rosidl_typesupport_c.so
-ball_detector_node: /opt/ros/humble/lib/librosidl_typesupport_c.so
-ball_detector_node: /opt/ros/humble/lib/librcpputils.so
 ball_detector_node: /opt/ros/humble/lib/libunique_identifier_msgs__rosidl_generator_c.so
-ball_detector_node: /opt/ros/humble/lib/librosidl_runtime_c.so
-ball_detector_node: /opt/ros/humble/lib/librcutils.so
 ball_detector_node: /usr/lib/x86_64-linux-gnu/liborocos-kdl.so
 ball_detector_node: /usr/local/lib/libopencv_imgcodecs.so.4.11.0
 ball_detector_node: /usr/local/lib/libopencv_imgproc.so.4.11.0
 ball_detector_node: /usr/local/lib/libopencv_core.so.4.11.0
 ball_detector_node: /usr/local/lib/libopencv_cudev.so.4.11.0
+ball_detector_node: /opt/ros/humble/lib/libgeometry_msgs__rosidl_typesupport_cpp.so
+ball_detector_node: /opt/ros/humble/lib/libstd_msgs__rosidl_typesupport_cpp.so
+ball_detector_node: /opt/ros/humble/lib/libbuiltin_interfaces__rosidl_typesupport_cpp.so
+ball_detector_node: /opt/ros/humble/lib/librosidl_typesupport_cpp.so
+ball_detector_node: /opt/ros/humble/lib/librosidl_typesupport_c.so
+ball_detector_node: /opt/ros/humble/lib/librcpputils.so
+ball_detector_node: /opt/ros/humble/lib/librosidl_runtime_c.so
+ball_detector_node: /opt/ros/humble/lib/librcutils.so
 ball_detector_node: CMakeFiles/ball_detector_node.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/song/volleyball_detection/build/station_detector_cpp/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX executable ball_detector_node"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/ball_detector_node.dir/link.txt --verbose=$(VERBOSE)

@@ -1,6 +1,32 @@
 #include "trajectory_predictor.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <cctype>
+
+namespace {
+
+std::string toLower(std::string s)
+{
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+bool crossedZ(double prev_z, double cur_z, double target_z, const std::string& crossing)
+{
+    if (crossing == "descending") {
+        return prev_z > target_z && cur_z <= target_z;
+    }
+    if (crossing == "ascending") {
+        return prev_z < target_z && cur_z >= target_z;
+    }
+    // next: any crossing
+    return (prev_z - target_z) * (cur_z - target_z) <= 0.0 &&
+           std::fabs(prev_z - cur_z) > 1e-12;
+}
+
+}  // namespace
 
 TrajectoryPredictor::TrajectoryPredictor(double gravity,
                                        double air_density,
@@ -24,11 +50,13 @@ TrajectoryPredictor::TrajectoryPredictor(double gravity,
     area_ = pi * r * r;
 }
 
-bool TrajectoryPredictor::predictLanding(const Eigen::Vector3d& pos0,
-                                         const Eigen::Vector3d& vel0,
-                                         double& time_to_land,
-                                         Eigen::Vector3d& landing_pos,
-                                         std::vector<Eigen::Vector3d>& path_points) const
+bool TrajectoryPredictor::predictAtZ(const Eigen::Vector3d& pos0,
+                                     const Eigen::Vector3d& vel0,
+                                     double target_z,
+                                     const std::string& crossing_in,
+                                     double& time_to_event,
+                                     Eigen::Vector3d& event_pos,
+                                     std::vector<Eigen::Vector3d>& path_points) const
 {
     path_points.clear();
 
@@ -36,22 +64,21 @@ bool TrajectoryPredictor::predictLanding(const Eigen::Vector3d& pos0,
         return false;
     }
 
+    const std::string crossing = toLower(crossing_in.empty() ? "descending" : crossing_in);
+
     Eigen::Vector3d pos = pos0;
     Eigen::Vector3d vel = vel0;
     double t = 0.0;
 
     path_points.push_back(pos);
 
-    // Semi-implicit Euler (a) update velocity then (b) update position
-    Eigen::Vector3d gravity(0.0, 0.0, -g_);
-
-    // acceleration coefficient: a_drag = -(0.5*rho*Cd*A / m) * |v| * v
+    const Eigen::Vector3d gravity(0.0, 0.0, -g_);
     const double k = (0.5 * rho_ * cd_ * area_) / mass_;
 
-    if (pos.z() <= ground_z_) {
-        time_to_land = 0.0;
-        landing_pos = pos;
-        landing_pos.z() = ground_z_;
+    if (crossedZ(pos.z() + 1e-9, pos.z(), target_z, crossing)) {
+        time_to_event = 0.0;
+        event_pos = pos;
+        event_pos.z() = target_z;
         return true;
     }
 
@@ -63,37 +90,47 @@ bool TrajectoryPredictor::predictLanding(const Eigen::Vector3d& pos0,
         const double speed = vel.norm();
         Eigen::Vector3d a = gravity;
         if (speed > 1e-6) {
-            // F_drag = -k*m * |v| * v, so a_drag = -k * |v| * v
             a += (-k * speed) * vel;
         }
 
-        // v_{n+1} = v_n + a_n * dt
         vel = prev_vel + a * dt_;
-
-        // x_{n+1} = x_n + v_{n+1} * dt  (semi-implicit)
         pos = prev_pos + vel * dt_;
         t += dt_;
 
-        // sample path
         path_points.push_back(pos);
 
-        if (pos.z() <= ground_z_) {
-            // Interpolate landing point more accurately
-            // prev_pos.z() > ground_z_ and pos.z() <= ground_z_
-            const double denom = (prev_pos.z() - pos.z());
+        if (crossedZ(prev_pos.z(), pos.z(), target_z, crossing)) {
+            const double denom = prev_pos.z() - pos.z();
             double alpha = 1.0;
             if (std::fabs(denom) > 1e-9) {
-                alpha = (prev_pos.z() - ground_z_) / denom; // in [0,1]
+                alpha = (prev_pos.z() - target_z) / denom;
             }
+            alpha = std::clamp(alpha, 0.0, 1.0);
 
-            landing_pos = prev_pos + alpha * (pos - prev_pos);
-            landing_pos.z() = ground_z_;
-
-            time_to_land = t - dt_ + alpha * dt_;
+            event_pos = prev_pos + alpha * (pos - prev_pos);
+            event_pos.z() = target_z;
+            time_to_event = t - dt_ + alpha * dt_;
             return true;
         }
     }
 
     return false;
+}
+
+bool TrajectoryPredictor::predictLanding(const Eigen::Vector3d& pos0,
+                                         const Eigen::Vector3d& vel0,
+                                         double& time_to_land,
+                                         Eigen::Vector3d& landing_pos,
+                                         std::vector<Eigen::Vector3d>& path_points) const
+{
+    if (pos0.z() <= ground_z_) {
+        path_points = {pos0};
+        time_to_land = 0.0;
+        landing_pos = pos0;
+        landing_pos.z() = ground_z_;
+        return true;
+    }
+    return predictAtZ(pos0, vel0, ground_z_, "descending",
+                      time_to_land, landing_pos, path_points);
 }
 

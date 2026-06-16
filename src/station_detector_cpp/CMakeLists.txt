@@ -28,6 +28,14 @@ include_directories(
   ${EIGEN3_INCLUDE_DIRS}
 )
 
+find_package(builtin_interfaces REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/VolleyballIntercept.msg"
+  DEPENDENCIES std_msgs geometry_msgs builtin_interfaces
+)
+
 # ---- 可执行文件 ----
 add_executable(ball_detector_node
   src/ball_detector_node.cpp
@@ -55,6 +63,11 @@ target_link_libraries(ball_detector_node
   ${OpenCV_LIBS}
   Eigen3::Eigen
 )
+
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(ball_detector_node "${cpp_typesupport_target}")
+add_dependencies(ball_detector_node ${PROJECT_NAME}__rosidl_generator_cpp)
 
 # YOLO device selection is runtime via cv::dnn::getAvailableBackends().
 set(_opencv_cuda_ok FALSE)
@@ -110,4 +123,5 @@ install(
 )
 
 # ---- ament 包 ----
+ament_export_dependencies(rosidl_default_runtime)
 ament_package()

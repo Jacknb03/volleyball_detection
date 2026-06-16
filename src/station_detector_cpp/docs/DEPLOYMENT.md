@@ -69,7 +69,7 @@ $$
 - [ ] 实测 **该机器上** 的 pose 间隔（不是 4060 上的 fps）
 - [ ] 无显卡机：`YOLO_DEVICE=cpu`，并按 [§六](#六无显卡--cpu-推理与模型优化) 评估是否需小模型 / OpenVINO / 视觉双机
 - [ ] 有 GPU 时：确认 `yolo.device` 未 silent 回退 CPU
-- [ ] 下游（1260P 控制机）能收到 `/volleyball_pose`、`/ball_prediction`
+- [ ] 下游（1260P 控制机）能收到 **`/ball_intercept`**（或兼容 `/volleyball_pose`）
 
 ### B. 相机与 3D
 
@@ -228,16 +228,15 @@ ros2 launch station_detector_cpp yolo.launch.py \
 ### 2.4 观测
 
 ```bash
+ros2 topic echo /ball_intercept
 ros2 topic echo /volleyball_pose
-ros2 topic echo /ball_prediction
 ros2 topic hz /camera/camera/color/image_raw    # realsense 模式
 # RViz 看 /debug_image（MODE: RGB/BBOX 或 RGB-D）
 ```
 
-### 2.5 时间戳（已修复）
+### 2.5 时间戳
 
-KF 与速度门控现在使用 **`image header.stamp`**，不再用 `node->now()`。  
-视频/相机必须发布正确时间戳，否则 dt 会乱。
+`/volleyball_pose` 与 `/ball_intercept` 的 `header.stamp` 为**观测时刻**；`event_time = stamp + time_to_event` 为预计到达拦截高度时刻。
 
 ---
 
@@ -342,7 +341,7 @@ ros2 run station_detector_cpp ball_detector_node \
 
 ## 五、机器人整机架构（EtherCAT / 1260P / 颠球）
 
-视觉仓库只负责 **看球 → `/volleyball_pose` / `/ball_prediction`**；接球机构、颠球、EtherCAT 主站由队友运动控制组实现。联调前建议对齐下面分工。
+视觉仓库只负责 **看球 → `/volleyball_pose` / `/ball_intercept`**；接球机构、颠球、EtherCAT 主站由队友运动控制组实现。联调前建议对齐下面分工。
 
 ### 5.1 「以太猫」是什么？
 
@@ -374,7 +373,7 @@ ros2 run station_detector_cpp ball_detector_node \
 ```text
 [视觉机] 4060 笔记本 / 带 GPU 的小主机 / Jetson
   RealSense + ball_detector_node
-  发布 /volleyball_pose、/ball_prediction（局域网 ROS2）
+  发布 /volleyball_pose、/ball_intercept（局域网 ROS2）
 
 [控制机] 1260P（EtherCAT 主站）
   订阅视觉话题 → 接球机构 + 颠球 IO
@@ -401,7 +400,7 @@ ros2 run station_detector_cpp ball_detector_node \
 
 - 视觉节点 **不驱动颠球**；全队需约定颠球时刻与 `header.stamp` 是否对齐。
 - 接球准备时间 + 颠球间隔决定 **最低检测 Hz**（见 §六 帧率表）。
-- 下游只需订阅 **`/volleyball_pose`**（滤波后 3D）和 **`/ball_prediction`**（落点）。
+- 下游优先订阅 **`/ball_intercept`**（拦截点 + 到达时间 + 速度）；兼容 **`/volleyball_pose`**（当前 3D）。
 
 ### 5.5 联调前问队友的三句话
 
