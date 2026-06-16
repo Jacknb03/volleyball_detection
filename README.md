@@ -300,9 +300,34 @@ flowchart LR
 | 帧 | 含义 |
 |----|------|
 | `camera_color_optical_frame` | RealSense 彩色光学系（+Z 朝前，+Y 向下） |
-| `odom` | 世界/场地系（`world_frame_id`），当前用静态 TF 占位 |
+| `odom` | **固定场地系**（`world_frame_id`），球轨迹应相对它静止（理想情况） |
 
-上机器人后必须用 URDF/标定替换「相机在 odom 上方 1 m」的占位 TF，否则落点只有相对形状对、绝对位置不对。
+**当前开发模式**：launch 用 **static TF** 把 `odom` 和相机绑死 → 相机怎么动，世界系跟着动 → **只适合手持/定点调试**。
+
+**小车上板**（车动、球相对场地不动）需要完整 TF 链，视觉节点**只查 TF、不自己发占位**：
+
+```text
+odom  ──(轮速计/定位)──►  base_link  ──(URDF 标定)──►  camera_link
+                                                      └── RealSense 内置 ──► camera_color_optical_frame
+```
+
+```bash
+# 关闭占位 static TF，改由底盘/robot_state_publisher 提供 TF
+ros2 launch station_detector_cpp yolo.launch.py \
+  pipeline_mode:=realsense use_static_camera_tf:=false
+```
+
+| 数据源 | 能提供什么 | 能否单独当「世界系」 |
+|--------|------------|-------------------|
+| **轮速里程计** `/odom` | `odom→base_link` 位姿 | ✅ 常用（会漂移） |
+| **URDF / 标定** | `base_link→camera_link` | ✅ 必须 |
+| **RealSense IMU**（D455i 有） | 相机姿态变化、角速度 | ❌ **无位置**；不能替代底盘 odom |
+| **占位 static TF** | 假装相机钉在 odom 上 | ❌ 车一动就错 |
+
+RealSense IMU 后续可接 `robot_localization` 做姿态融合，但**球在固定世界系下的轨迹**仍依赖 `odom→base_link`（底盘）。  
+`ball_detector_node` 已通过 `tf_buffer_->lookupTransform(world_frame_id, camera_frame, …)` 接外部 TF，**不必改 C++**，只需换 TF 来源。
+
+yaml：`world_frame_id: "odom"`（或队伍用的 `map`），与底盘约定一致即可。
 
 ---
 

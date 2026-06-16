@@ -28,6 +28,12 @@ def _setup(context, *args, **kwargs):
     if mode not in ("video", "realsense"):
         raise RuntimeError(f"pipeline_mode must be 'video' or 'realsense', got: {mode!r}")
 
+    use_static_tf = LaunchConfiguration("use_static_camera_tf").perform(context).strip().lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
     default_model = os.path.join(cpp_share, "model", "best.onnx")
     model_path = LaunchConfiguration("model_path").perform(context) or default_model
     yolo_device = LaunchConfiguration("yolo_device").perform(context)
@@ -42,19 +48,38 @@ def _setup(context, *args, **kwargs):
 
     nodes = []
 
+    static_tf = None
+    if use_static_tf:
+        if mode == "video":
+            static_tf = Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                name="tf_static_camera",
+                output="screen",
+                arguments=[
+                    "--x", "0", "--y", "0", "--z", "1",
+                    "--yaw", "0", "--pitch", "0", "--roll", "0",
+                    "--frame-id", "odom",
+                    "--child-frame-id", "camera_optical_frame",
+                ],
+            )
+        else:
+            # 开发占位：odom→camera_link。小车移动时请 use_static_camera_tf:=false，
+            # 由底盘/定位发布 odom→base_link，URDF 提供 base_link→camera_link。
+            static_tf = Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                name="tf_static_camera",
+                output="screen",
+                arguments=[
+                    "--x", "0", "--y", "0", "--z", "1.0",
+                    "--yaw", "0", "--pitch", "0", "--roll", "0",
+                    "--frame-id", "odom",
+                    "--child-frame-id", "camera_link",
+                ],
+            )
+
     if mode == "video":
-        static_tf = Node(
-            package="tf2_ros",
-            executable="static_transform_publisher",
-            name="tf_static_camera",
-            output="screen",
-            arguments=[
-                "--x", "0", "--y", "0", "--z", "1",
-                "--yaw", "0", "--pitch", "0", "--roll", "0",
-                "--frame-id", "odom",
-                "--child-frame-id", "camera_optical_frame",
-            ],
-        )
         video_pub = Node(
             package="station_detector_cpp",
             executable="video_publisher.py",
@@ -81,22 +106,11 @@ def _setup(context, *args, **kwargs):
                 },
             ],
         )
-        nodes = [static_tf, video_pub, ball_detector]
+        nodes = []
+        if static_tf is not None:
+            nodes.append(static_tf)
+        nodes.extend([video_pub, ball_detector])
     else:
-        # 必须挂到 camera_link：RealSense 已发布 camera_link→…→camera_color_optical_frame，
-        # 若 odom 直连 camera_color_optical_frame 会造成 TF 两棵树，KF 永远拿不到 world 测量。
-        static_tf = Node(
-            package="tf2_ros",
-            executable="static_transform_publisher",
-            name="tf_static_camera",
-            output="screen",
-            arguments=[
-                "--x", "0", "--y", "0", "--z", "1.0",
-                "--yaw", "0", "--pitch", "0", "--roll", "0",
-                "--frame-id", "odom",
-                "--child-frame-id", "camera_link",
-            ],
-        )
         realsense = Node(
             package="realsense2_camera",
             executable="realsense2_camera_node",
@@ -133,7 +147,20 @@ def _setup(context, *args, **kwargs):
                 },
             ],
         )
-        nodes = [static_tf, realsense, ball_detector]
+        nodes = [realsense, ball_detector]
+        if static_tf is not None:
+            nodes.insert(0, static_tf)
+
+    if not use_static_tf:
+        nodes.insert(
+            0,
+            LogInfo(
+                msg=[
+                    "use_static_camera_tf=false: 请由机器人发布 TF 链 ",
+                    "odom→base_link→camera_link→…→camera_color_optical_frame",
+                ]
+            ),
+        )
 
     return nodes
 
@@ -157,6 +184,11 @@ def generate_launch_description():
             DeclareLaunchArgument("frame_rate", default_value="15.0"),
             DeclareLaunchArgument("model_path", default_value=default_model),
             DeclareLaunchArgument("yolo_device", default_value="auto"),
+            DeclareLaunchArgument(
+                "use_static_camera_tf",
+                default_value="true",
+                description="true=开发占位 static TF；false=接机器人底盘/URDF 的 TF 树",
+            ),
             LogInfo(msg=["pipeline_mode=", LaunchConfiguration("pipeline_mode")]),
             OpaqueFunction(function=_setup),
         ]

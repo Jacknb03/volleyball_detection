@@ -80,6 +80,7 @@ $$
 
 ### C. 坐标系（最容易漏）
 
+- [ ] 小车模式：`use_static_camera_tf:=false`，TF 链 `odom→base_link→camera_link→…` 由底盘+URDF 提供
 - [ ] 不再用占位 static TF（“相机在 odom 上方 1 m”那种）
 - [ ] `world_frame_id` 和队伍约定的场地/机器人坐标一致
 - [ ] 重力方向对：落点不会总往地下穿或往天上飞
