@@ -63,6 +63,7 @@
 
 | 参数 | 默认 | 调参 |
 |------|------|------|
+| `yolo.detect_min_interval_sec` | 0.10 | YOLO 最短间隔 [s]；`0`=每帧。跳帧时 KF 仍按每帧真实 `dt` 预测 |
 | `detection.h_ema_alpha` | 0.3 | 越小越稳（0.15–0.2），越大越灵敏（0.4–0.5） |
 | `kalman.process_noise` | 0.05 | ↑ 更跟得上加速；↓ 轨迹更平滑 |
 | `kalman.measurement_noise` | 50.0 | 越大越不信 YOLO/深度抖动（对应 $\mathbf{R}$） |

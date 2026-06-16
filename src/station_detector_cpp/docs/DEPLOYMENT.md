@@ -494,7 +494,7 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz=416 opset=
 |------|------|
 | 降相机分辨率 | RealSense 彩色 **640×480@30** |
 | 明确 CPU | `config/pipeline.conf` → `YOLO_DEVICE=cpu` |
-| 跳帧检测 | 每 N 帧跑一次 YOLO，中间靠 KF（**待实现**） |
+| 跳帧检测 | `yolo.detect_min_interval_sec`（默认 0.10s）| 中间帧 KF 按真实 dt 预测，**已实现** |
 | ROI 跟踪 | 有框后只裁局部 patch 推理（**待实现**） |
 | CPU 绑核 | EtherCAT 与视觉分 P 核，避免互相拖死 |
 

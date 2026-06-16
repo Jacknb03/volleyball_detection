@@ -8,6 +8,7 @@ ball_detector_node:
       conf_threshold: 0.18
       iou_threshold: 0.45
       device: "auto"
+      detect_min_interval_sec: 0.10   # YOLO 最短间隔 [s]；0=每帧检测。中间帧 KF 按真实 dt 预测
       volleyball_classes:
         - "volleyball"
         - "Volleyball"

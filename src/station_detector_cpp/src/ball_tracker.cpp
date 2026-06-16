@@ -158,21 +158,24 @@ void BallTracker::update(const Eigen::Vector3d& measurement, double timestamp)
 }
 
 Eigen::Vector3d BallTracker::updateWithMissing(const std::optional<Eigen::Vector3d>& measurement,
-                                           double timestamp)
+                                           double timestamp,
+                                           bool count_as_missing)
 {
     if (!measurement.has_value()) {
-        missing_frames_ += 1;
+        if (count_as_missing) {
+            missing_frames_ += 1;
 
-        if (missing_frames_ > max_missing_frames_) {
-            is_initialized_ = false;
-            state_.setZero();
-            P_.setIdentity();
-            P_ *= 10.0f;
-            missing_frames_ = 0;
-            last_update_time_ = 0.0;
-            has_last_measurement_ = false;
-            velocity_bootstrapped_ = false;
-            return Eigen::Vector3d::Zero();
+            if (missing_frames_ > max_missing_frames_) {
+                is_initialized_ = false;
+                state_.setZero();
+                P_.setIdentity();
+                P_ *= 10.0f;
+                missing_frames_ = 0;
+                last_update_time_ = 0.0;
+                has_last_measurement_ = false;
+                velocity_bootstrapped_ = false;
+                return Eigen::Vector3d::Zero();
+            }
         }
 
         return predict(timestamp);

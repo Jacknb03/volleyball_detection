@@ -42,7 +42,8 @@ public:
      * @return            当前估计位置（未初始化返回全 0）
      */
     Eigen::Vector3d updateWithMissing(const std::optional<Eigen::Vector3d>& measurement,
-                                        double timestamp);
+                                        double timestamp,
+                                        bool count_as_missing = true);
 
     /// 当前是否已经初始化（等价 is_initialized）
     bool isInitialized() const { return is_initialized_; }

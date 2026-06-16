@@ -47,6 +47,7 @@ public:
         declare_parameter<double>("yolo.conf_threshold", 0.5);
         declare_parameter<double>("yolo.iou_threshold", 0.45);
         declare_parameter<std::string>("yolo.device", "auto");
+        declare_parameter<double>("yolo.detect_min_interval_sec", 0.1);
         declare_parameter<std::vector<std::string>>("yolo.volleyball_classes",
                                                     std::vector<std::string>{"sports ball", "ball"});
 
@@ -225,6 +226,15 @@ private:
         RCLCPP_INFO(get_logger(),
                     "YOLODetector created: type=%s, conf=%.2f, iou=%.2f, device=%s",
                     model_type.c_str(), conf_th, iou_th, device.c_str());
+        const double detect_interval =
+            get_parameter("yolo.detect_min_interval_sec").as_double();
+        if (detect_interval > 0.0) {
+            RCLCPP_INFO(get_logger(),
+                        "YOLO detect min interval: %.3fs (~%.1f Hz max)",
+                        detect_interval, 1.0 / detect_interval);
+        } else {
+            RCLCPP_INFO(get_logger(), "YOLO detect: every frame (no rate limit)");
+        }
     }
 
     void initTracking()
@@ -567,78 +577,108 @@ private:
             frame_dt = (frame_time - last_frame_time_).seconds();
         }
 
-        // 1) YOLO 检测
-        std::vector<Detection> detections;
-        try {
-            detections = yolo_detector_->detect(frame);
-        } catch (const std::exception& e) {
-            RCLCPP_ERROR(get_logger(), "YOLO detect failed: %s", e.what());
-            detections.clear();
-        }
-        RCLCPP_DEBUG(get_logger(), "[YOLO RAW] %zu detections after conf filter", detections.size());
-
-        const bool emergency_bypass =
-            get_parameter("detection.emergency_bypass").as_bool();
-        const double min_confidence =
-            get_parameter("detection.min_confidence").as_double();
-
-        // 2) 类别 / 置信度 / 跟踪过滤（默认开启；emergency_bypass=true 时跳过）
-        std::vector<Detection> volleyball_detections;
-        if (emergency_bypass) {
-            volleyball_detections = detections;
-        } else {
-            volleyball_detections.reserve(detections.size());
-            for (const auto& d : detections) {
-                if (!isVolleyballClass(d.class_id)) {
-                    continue;
-                }
-                if (d.confidence < static_cast<float>(min_confidence)) {
-                    continue;
-                }
-                volleyball_detections.push_back(d);
+        const double detect_min_interval =
+            get_parameter("yolo.detect_min_interval_sec").as_double();
+        bool run_yolo = true;
+        if (detect_min_interval > 0.0 && has_last_yolo_run_time_) {
+            const double since_last_yolo = (frame_time - last_yolo_run_time_).seconds();
+            if (since_last_yolo < detect_min_interval) {
+                run_yolo = false;
             }
         }
 
-        // 3) 选择最佳检测
+        last_yolo_skipped_ = !run_yolo;
+
+        std::vector<Detection> detections;
+        std::vector<Detection> volleyball_detections;
         bool has_best = false;
         Detection best_det{};
-        if (!volleyball_detections.empty()) {
-            if (!emergency_bypass && multi_tracker_) {
-                std::vector<cv::Point2f> centers;
-                centers.reserve(volleyball_detections.size());
-                for (const auto& d : volleyball_detections) {
-                    centers.emplace_back(d.x + d.width * 0.5f, d.y + d.height * 0.5f);
+
+        if (run_yolo) {
+            last_yolo_run_time_ = frame_time;
+            has_last_yolo_run_time_ = true;
+
+            try {
+                detections = yolo_detector_->detect(frame);
+            } catch (const std::exception& e) {
+                RCLCPP_ERROR(get_logger(), "YOLO detect failed: %s", e.what());
+                detections.clear();
+            }
+            RCLCPP_DEBUG(get_logger(), "[YOLO RAW] %zu detections after conf filter",
+                         detections.size());
+
+            const bool emergency_bypass =
+                get_parameter("detection.emergency_bypass").as_bool();
+            const double min_confidence =
+                get_parameter("detection.min_confidence").as_double();
+
+            if (emergency_bypass) {
+                volleyball_detections = detections;
+            } else {
+                volleyball_detections.reserve(detections.size());
+                for (const auto& d : detections) {
+                    if (!isVolleyballClass(d.class_id)) {
+                        continue;
+                    }
+                    if (d.confidence < static_cast<float>(min_confidence)) {
+                        continue;
+                    }
+                    volleyball_detections.push_back(d);
                 }
-                const int best_idx = multi_tracker_->update(centers);
-                if (best_idx >= 0 &&
-                    best_idx < static_cast<int>(volleyball_detections.size())) {
-                    best_det = volleyball_detections[static_cast<size_t>(best_idx)];
-                    has_best = true;
-                    ball_found = true;
+            }
+
+            if (!volleyball_detections.empty()) {
+                if (!emergency_bypass && multi_tracker_) {
+                    std::vector<cv::Point2f> centers;
+                    centers.reserve(volleyball_detections.size());
+                    for (const auto& d : volleyball_detections) {
+                        centers.emplace_back(d.x + d.width * 0.5f, d.y + d.height * 0.5f);
+                    }
+                    const int best_idx = multi_tracker_->update(centers);
+                    if (best_idx >= 0 &&
+                        best_idx < static_cast<int>(volleyball_detections.size())) {
+                        best_det = volleyball_detections[static_cast<size_t>(best_idx)];
+                        has_best = true;
+                        ball_found = true;
+                    }
+                } else {
+                    has_best = yolo_detector_->selectBestDetection(
+                        volleyball_detections, "confidence", best_det);
+                    ball_found = has_best;
                 }
             } else {
-                has_best = yolo_detector_->selectBestDetection(
-                    volleyball_detections, "confidence", best_det);
-                ball_found = has_best;
+                fresh_det_block_reason = "No detection after filter";
+            }
+
+            if (has_best && !get_parameter("detection.emergency_bypass").as_bool() &&
+                detection_filter_) {
+                const float cx = best_det.x + best_det.width * 0.5f;
+                const float cy = best_det.y + best_det.height * 0.5f;
+                if (!detection_filter_->validate(cx, cy, best_det.confidence,
+                                                 frame.cols, frame.rows)) {
+                    has_best = false;
+                    ball_found = false;
+                    fresh_det_block_reason = "DetectionFilter rejected";
+                }
             }
         } else {
-            fresh_det_block_reason = "No detection after filter";
-        }
-
-        if (has_best && !emergency_bypass && detection_filter_) {
-            const float cx = best_det.x + best_det.width * 0.5f;
-            const float cy = best_det.y + best_det.height * 0.5f;
-            if (!detection_filter_->validate(cx, cy, best_det.confidence,
-                                             frame.cols, frame.rows)) {
-                has_best = false;
-                ball_found = false;
-                fresh_det_block_reason = "DetectionFilter rejected";
+            fresh_det_block_reason = "YOLO rate-limited (KF predict)";
+            if (has_cached_best_det_) {
+                best_det = cached_best_det_;
+                has_best = true;
+                ball_found = true;
+                volleyball_detections.push_back(cached_best_det_);
             }
         }
 
-        // 4) 估计相机 3D -> TF 到 world
+        if (run_yolo && has_best) {
+            cached_best_det_ = best_det;
+            has_cached_best_det_ = true;
+        }
+
+        // 4) 估计相机 3D -> TF 到 world（仅 YOLO 实测帧更新测量）
         std::optional<Eigen::Vector3d> measurement_world = std::nullopt;
-        if (has_best) {
+        if (run_yolo && has_best) {
             float cx = best_det.x + best_det.width * 0.5f;
             float cy = best_det.y + best_det.height * 0.5f;
             frame_raw_bbox_height = static_cast<double>(best_det.height);
@@ -721,9 +761,10 @@ private:
             }
         }
 
-        // 7) 卡尔曼滤波更新（含丢帧预测）
+        // 7) 卡尔曼滤波：每帧用真实 timestamp_sec；跳帧时只 predict，不计入丢检
         const bool kf_was_initialized = ball_tracker_->isInitialized();
-        ball_tracker_->updateWithMissing(measurement_world, timestamp_sec);
+        const bool count_as_missing = run_yolo && !measurement_world.has_value();
+        ball_tracker_->updateWithMissing(measurement_world, timestamp_sec, count_as_missing);
         if (!ball_tracker_->isInitialized() && kf_was_initialized) {
             resetTrackingState("kalman lost track");
         }
@@ -1129,6 +1170,15 @@ private:
             info_y += 22;
         }
 
+        if (last_yolo_skipped_) {
+            cv::putText(debug_img,
+                        "YOLO: skipped (KF predict)",
+                        cv::Point(10, info_y),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.55,
+                        cv::Scalar(180, 180, 180), 2);
+            info_y += 22;
+        }
+
         // 绘制状态信息（对齐 Python）
         cv::putText(debug_img,
                     "Detections: " + std::to_string(detections.size()),
@@ -1305,6 +1355,12 @@ private:
     bool last_intercept_valid_{false};
     double last_time_to_event_{0.0};
     Eigen::Vector3d last_intercept_pos_{0.0, 0.0, 0.0};
+
+    rclcpp::Time last_yolo_run_time_{0, 0, RCL_ROS_TIME};
+    bool has_last_yolo_run_time_{false};
+    bool last_yolo_skipped_{false};
+    Detection cached_best_det_{};
+    bool has_cached_best_det_{false};
 };
 
 int main(int argc, char** argv)
