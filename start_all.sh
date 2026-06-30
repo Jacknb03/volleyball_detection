@@ -1,11 +1,12 @@
 #!/bin/bash
-set -eo pipefail
+# 启动视觉 + 可选 RViz（工控机有桌面时用 gnome-terminal；否则前台运行）
+set -euo pipefail
 
 WS_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RVIZ_CONFIG="${RVIZ_CONFIG:-$WS_PATH/config/volleyball_debug.rviz}"
 PIPELINE_CONF="${PIPELINE_CONF:-$WS_PATH/config/pipeline.conf}"
+USE_RVIZ="${USE_RVIZ:-true}"
 
-# 读取 config/pipeline.conf（USE_REALSENSE / YOLO_DEVICE 等）
 if [[ -f "$PIPELINE_CONF" ]]; then
   set +u
   # shellcheck disable=SC1090
@@ -16,7 +17,6 @@ fi
 # shellcheck disable=SC1091
 source "$WS_PATH/scripts/ros_env.sh"
 
-# USE_REALSENSE=true → realsense；否则 video（命令行 PIPELINE_MODE 仍可覆盖）
 if [[ -z "${PIPELINE_MODE:-}" ]]; then
   if [[ "${USE_REALSENSE:-false}" == "true" ]]; then
     PIPELINE_MODE=realsense
@@ -25,57 +25,57 @@ if [[ -z "${PIPELINE_MODE:-}" ]]; then
   fi
 fi
 
-DEFAULT_VIDEO="$WS_PATH/src/station_detector_cpp/videos/test.mp4"
-DEFAULT_MODEL="$WS_PATH/src/station_detector_cpp/model/best.onnx"
-
-VIDEO_PATH="${VIDEO_PATH:-$DEFAULT_VIDEO}"
-MODEL_PATH="${MODEL_PATH:-$DEFAULT_MODEL}"
-FRAME_RATE="${FRAME_RATE:-15.0}"
-YOLO_DEVICE="${YOLO_DEVICE:-auto}"
+export PIPELINE_MODE
+export MODEL_PATH="${MODEL_PATH:-$WS_PATH/src/station_detector_cpp/model/best.onnx}"
+export VIDEO_PATH="${VIDEO_PATH:-$WS_PATH/src/station_detector_cpp/videos/test.mp4}"
+export FRAME_RATE="${FRAME_RATE:-15.0}"
+export YOLO_DEVICE="${YOLO_DEVICE:-cpu}"
+export RVIZ_CONFIG
 
 if [[ ! -f "$MODEL_PATH" ]]; then
   echo "错误: YOLO 模型不存在: $MODEL_PATH"
   echo "请把 best.onnx 放到 src/station_detector_cpp/model/ 或设置 MODEL_PATH"
   exit 1
 fi
+
 echo "YOLO 模型: $MODEL_PATH ($(du -h "$MODEL_PATH" | cut -f1))"
-
-LAUNCH_CMD="ros2 launch station_detector_cpp yolo.launch.py \
-  pipeline_mode:=$PIPELINE_MODE \
-  model_path:=$MODEL_PATH \
-  yolo_device:=$YOLO_DEVICE"
-
-if [[ "$PIPELINE_MODE" == "video" ]]; then
-  LAUNCH_CMD="$LAUNCH_CMD video_path:=$VIDEO_PATH frame_rate:=$FRAME_RATE"
-fi
-
-RVIZ_CMD="rviz2"
-if [[ -f "$RVIZ_CONFIG" ]]; then
-  RVIZ_CMD="rviz2 -d $RVIZ_CONFIG"
-fi
-
-MODE_LABEL="视频 + bbox 估深"
-if [[ "$PIPELINE_MODE" == "realsense" ]]; then
-  MODE_LABEL="RealSense D455i + RGB-D 深度"
-fi
-
-echo "正在启动：$MODE_LABEL"
+echo "模式: $PIPELINE_MODE | 设备: $YOLO_DEVICE | RViz: $USE_RVIZ"
 echo "配置: $PIPELINE_CONF"
 echo ""
-echo "Launch: $LAUNCH_CMD"
-echo "RViz:   $RVIZ_CMD"
-echo ""
-echo "另开终端调试（无需 source）:"
+echo "调试（无需 source）:"
 echo "  ./run.sh ros2 topic echo /ball_intercept --once"
-echo "  ./start_executor.sh   # Stewart 桥接"
+echo "  ./start_executor.sh"
 echo ""
 
-ENV_SNIPPET="set +u; source '$WS_PATH/scripts/ros_env.sh'; set -u 2>/dev/null || true"
+VISION_SCRIPT="$WS_PATH/scripts/launch_vision.sh"
+RVIZ_SCRIPT="$WS_PATH/scripts/launch_rviz.sh"
 
-if command -v gnome-terminal >/dev/null 2>&1; then
-  gnome-terminal --tab --title="Volleyball_${PIPELINE_MODE}" -- bash -c "${ENV_SNIPPET} ${LAUNCH_CMD}; exec bash"
-  gnome-terminal --tab --title="RViz2" -- bash -c "${ENV_SNIPPET} ${RVIZ_CMD}; exec bash"
-else
-  echo "未检测到 gnome-terminal，改为前台启动。"
-  exec bash -c "$LAUNCH_CMD"
+use_gnome=false
+if command -v gnome-terminal >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+  use_gnome=true
 fi
+
+if $use_gnome; then
+  echo "使用 gnome-terminal 启动..."
+  if ! gnome-terminal --tab --title="Volleyball_${PIPELINE_MODE}" -- \
+      bash -lc "'$VISION_SCRIPT'; exec bash"; then
+    echo "警告: gnome-terminal 失败，改前台启动。"
+    use_gnome=false
+  elif [[ "${USE_RVIZ}" == "true" ]]; then
+    gnome-terminal --tab --title="RViz2" -- \
+      bash -lc "'$RVIZ_SCRIPT'; exec bash" || echo "警告: RViz 标签页未打开（可忽略）。"
+  fi
+  if $use_gnome; then
+    echo "已在 gnome-terminal 中启动。"
+    exit 0
+  fi
+fi
+
+if [[ -z "${DISPLAY:-}" ]]; then
+  echo "未检测到 DISPLAY（SSH 远程登录？）。改为本终端前台启动视觉节点。"
+  echo "若要在工控机本机桌面启动，请在本机图形终端里运行 ./start_all.sh"
+  echo ""
+fi
+
+echo "前台启动视觉 launch（Ctrl+C 停止）..."
+exec "$VISION_SCRIPT"
