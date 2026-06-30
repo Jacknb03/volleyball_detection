@@ -1,48 +1,80 @@
 #!/bin/bash
-# 启动视觉 + 可选 RViz
 set -eo pipefail
+
+ros_source() {
+  set +u
+  source /opt/ros/humble/setup.bash
+  cd "$WS_PATH"
+  source install/setup.bash
+  set -u 2>/dev/null || true
+}
 
 WS_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RVIZ_CONFIG="${RVIZ_CONFIG:-$WS_PATH/config/volleyball_debug.rviz}"
 PIPELINE_CONF="${PIPELINE_CONF:-$WS_PATH/config/pipeline.conf}"
-USE_RVIZ="${USE_RVIZ:-true}"
 
-if [[ ! -f "$WS_PATH/scripts/launch_vision.sh" ]]; then
-  echo "错误: 缺少 scripts/launch_vision.sh"
-  exit 1
+if [[ -f "$PIPELINE_CONF" ]]; then
+  set +u
+  # shellcheck disable=SC1090
+  source "$PIPELINE_CONF"
+  set -u 2>/dev/null || true
 fi
 
-if [[ ! -f "$WS_PATH/src/station_detector_cpp/model/best.onnx" ]]; then
-  echo "错误: 缺少 best.onnx → src/station_detector_cpp/model/"
-  exit 1
-fi
+ros_source
 
-echo "=== 排球视觉启动 ==="
-echo "配置: $PIPELINE_CONF"
-echo "RViz: $USE_RVIZ（画面来自 ball_detector 的 /debug_image，不是原始相机话题）"
-echo ""
-
-VISION_SCRIPT="$WS_PATH/scripts/launch_vision.sh"
-RVIZ_SCRIPT="$WS_PATH/scripts/launch_rviz.sh"
-
-# 与桌面/SSH 无关：有 DISPLAY 且 gnome-terminal 可用 → 开新 tab；否则当前终端前台跑
-if command -v gnome-terminal >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
-  echo "→ gnome-terminal 启动视觉 tab..."
-  gnome-terminal --tab --title="Volleyball" -- \
-    env PIPELINE_CONF="$PIPELINE_CONF" WS_PATH="$WS_PATH" bash "$VISION_SCRIPT" || {
-    echo "gnome-terminal 失败，改前台启动"
-    exec env PIPELINE_CONF="$PIPELINE_CONF" WS_PATH="$WS_PATH" bash "$VISION_SCRIPT"
-  }
-  if [[ "${USE_RVIZ}" == "true" ]]; then
-    echo "→ gnome-terminal 启动 RViz tab..."
-    gnome-terminal --tab --title="RViz2" -- \
-      env RVIZ_CONFIG="$RVIZ_CONFIG" WS_PATH="$WS_PATH" bash "$RVIZ_SCRIPT" || true
+CUDNN_LIB="${CUDNN_LIB:-$HOME/opencv_build/cudnn/lib}"
+if [[ -f /usr/local/lib/libopencv_dnn.so ]]; then
+  export LD_LIBRARY_PATH="/usr/local/lib:$CUDNN_LIB:${LD_LIBRARY_PATH:-}"
+else
+  OPENCV_CUDA_LIB="${OPENCV_CUDA_LIB:-$HOME/opencv_build/opencv/build_cuda/lib}"
+  if [[ -d "$OPENCV_CUDA_LIB" ]]; then
+    export LD_LIBRARY_PATH="$CUDNN_LIB:$OPENCV_CUDA_LIB:${LD_LIBRARY_PATH:-}"
   fi
-  echo "已提交到 gnome-terminal。请查看 Volleyball tab 是否有 launch 输出。"
-  echo "验证: ./run.sh ros2 topic hz /camera/camera/color/image_raw"
-  echo "      ./run.sh ros2 topic hz /debug_image"
-  exit 0
 fi
 
-echo "→ 当前终端前台启动（SSH 或无 gnome-terminal 时正常）..."
-exec env PIPELINE_CONF="$PIPELINE_CONF" WS_PATH="$WS_PATH" bash "$VISION_SCRIPT"
+if [[ -z "${PIPELINE_MODE:-}" ]]; then
+  if [[ "${USE_REALSENSE:-false}" == "true" ]]; then
+    PIPELINE_MODE=realsense
+  else
+    PIPELINE_MODE=video
+  fi
+fi
+
+DEFAULT_VIDEO="$WS_PATH/src/station_detector_cpp/videos/test.mp4"
+DEFAULT_MODEL="$WS_PATH/src/station_detector_cpp/model/best.onnx"
+
+VIDEO_PATH="${VIDEO_PATH:-$DEFAULT_VIDEO}"
+MODEL_PATH="${MODEL_PATH:-$DEFAULT_MODEL}"
+FRAME_RATE="${FRAME_RATE:-15.0}"
+YOLO_DEVICE="${YOLO_DEVICE:-auto}"
+
+if [[ ! -f "$MODEL_PATH" ]]; then
+  echo "错误: YOLO 模型不存在: $MODEL_PATH"
+  exit 1
+fi
+
+LAUNCH_CMD="ros2 launch station_detector_cpp yolo.launch.py \
+  pipeline_mode:=$PIPELINE_MODE \
+  model_path:=$MODEL_PATH \
+  yolo_device:=$YOLO_DEVICE"
+
+if [[ "$PIPELINE_MODE" == "video" ]]; then
+  LAUNCH_CMD="$LAUNCH_CMD video_path:=$VIDEO_PATH frame_rate:=$FRAME_RATE"
+fi
+
+RVIZ_CMD="rviz2"
+if [[ -f "$RVIZ_CONFIG" ]]; then
+  RVIZ_CMD="rviz2 -d $RVIZ_CONFIG"
+fi
+
+echo "Launch: $LAUNCH_CMD"
+
+RUN_PREFIX="set +u; source /opt/ros/humble/setup.bash; cd '$WS_PATH'; source install/setup.bash; set -u 2>/dev/null || true; export LD_LIBRARY_PATH='${LD_LIBRARY_PATH:-}'; "
+
+if command -v gnome-terminal >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+  gnome-terminal --tab --title="Volleyball_${PIPELINE_MODE}" -- bash -c "${RUN_PREFIX} ${LAUNCH_CMD}; exec bash"
+  gnome-terminal --tab --title="RViz2" -- bash -c "${RUN_PREFIX} ${RVIZ_CMD}; exec bash"
+else
+  echo "前台启动（无 gnome-terminal 或无 DISPLAY）"
+  bash -c "${RUN_PREFIX} ${LAUNCH_CMD}"
+fi
