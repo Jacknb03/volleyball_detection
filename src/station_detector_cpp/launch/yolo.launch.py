@@ -59,13 +59,12 @@ def _setup(context, *args, **kwargs):
                 arguments=[
                     "--x", "0", "--y", "0", "--z", "1",
                     "--yaw", "0", "--pitch", "0", "--roll", "0",
-                    "--frame-id", "odom",
+                    "--frame-id", "base_link",
                     "--child-frame-id", "camera_optical_frame",
                 ],
             )
         else:
-            # 开发占位：odom→camera_link。小车移动时请 use_static_camera_tf:=false，
-            # 由底盘/定位发布 odom→base_link，URDF 提供 base_link→camera_link。
+            # 开发占位：base_link→camera_link。实机由 URDF 发布 base_link→camera_link。
             static_tf = Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
@@ -74,7 +73,7 @@ def _setup(context, *args, **kwargs):
                 arguments=[
                     "--x", "0", "--y", "0", "--z", "1.0",
                     "--yaw", "0", "--pitch", "0", "--roll", "0",
-                    "--frame-id", "odom",
+                    "--frame-id", "base_link",
                     "--child-frame-id", "camera_link",
                 ],
             )
@@ -156,8 +155,8 @@ def _setup(context, *args, **kwargs):
             0,
             LogInfo(
                 msg=[
-                    "use_static_camera_tf=false: 请由机器人发布 TF 链 ",
-                    "odom→base_link→camera_link→…→camera_color_optical_frame",
+                    "use_static_camera_tf=false: 请由 URDF 发布 ",
+                    "base_link→camera_link→…→camera_color_optical_frame",
                 ]
             ),
         )

@@ -1,1 +1,0 @@
-ament_cmake_symlink_install_targets("TARGET_FILES" "/home/song/volleyball_detection/build/station_detector_cpp/rosidl_generator_py/station_detector_cpp/station_detector_cpp_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so" "TARGETS" "station_detector_cpp__rosidl_typesupport_fastrtps_c__pyext" "DESTINATION" "local/lib/python3.10/dist-packages/station_detector_cpp")

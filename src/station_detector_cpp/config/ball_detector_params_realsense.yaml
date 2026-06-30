@@ -31,7 +31,7 @@ ball_detector_node:
       process_noise: 0.05
       measurement_noise: 50.0
       initial_uncertainty: 10.0
-      max_missing_frames: 15
+      max_missing_frames: 25            # 短暂盲区多撑一会儿
 
     detection:
       max_jump_distance: 100.0
@@ -45,15 +45,16 @@ ball_detector_node:
       emergency_bypass: false
 
     trajectory:
+      enable: false                   # false=车体系实时跟踪；true=弹道拦截预测
       prediction_time: 0.5
       num_points: 10
       integration_dt: 0.01
       max_time: 5.0
       ground_z: 0.0
-      intercept_z: 1.0                # 击球高度 [m]，详见 README §输出话题
+      intercept_z: 1.0                # 仅 enable:true 时生效
       intercept_crossing: "descending"
 
-    world_frame_id: "odom"
+    world_frame_id: "base_link"       # 固定相机：static TF 标定后球位在 base_link
     camera_frame_id: "camera_color_optical_frame"
     air_density: 1.225
     drag_coefficient: 0.47

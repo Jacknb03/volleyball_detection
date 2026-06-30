@@ -1,1 +1,0 @@
-/home/song/volleyball_detection/src/station_detector/launch/yolo_static_image.launch.py

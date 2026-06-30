@@ -10,7 +10,7 @@
 1. **YOLO** — 2D 像素框  
 2. **DetectionFilter** — 像素跳变 / 置信度 / 连续帧门控（见 `detection_filter.cpp`）  
 3. **Estimator** — bbox 估深 或 深度图采样 → 3D  
-4. **TF** — 相机系 → `odom`  
+4. **TF** — 相机系 → `base_link`（固定相机 static TF 标定）
 5. **Kalman** — 6 状态 CV 模型，平滑 + 速度（见 `ball_tracker.cpp`）  
 6. **Predictor** — 重力 + 二次阻力 → 穿过 `intercept_z` 的拦截点（见 `trajectory_predictor.cpp`）  
 
@@ -54,8 +54,8 @@
 | `volleyball.min_depth` | 0.2 | 过滤过近误检 |
 | `position.depth_min_m` / `depth_max_m` | 0.3 / 8.0 | **depth 模式**有效量程 |
 | `position.depth_patch_radius` | 2 | 深度中值滤波半径 |
-| `world_frame_id` | odom | 与 TF 一致 |
-| static TF `z` | 1.0 | 占位相机高度；上机器人后换标定 |
+| `world_frame_id` | base_link | 无里程计：球相对车体 |
+| `trajectory.enable` | false | false=实时跟踪；true=弹道 intercept |
 
 ---
 

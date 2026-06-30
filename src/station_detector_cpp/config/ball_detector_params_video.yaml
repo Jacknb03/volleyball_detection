@@ -29,7 +29,7 @@ ball_detector_node:
       process_noise: 0.05
       measurement_noise: 50.0
       initial_uncertainty: 10.0
-      max_missing_frames: 15
+      max_missing_frames: 25
 
     detection:
       max_jump_distance: 100.0
@@ -43,6 +43,7 @@ ball_detector_node:
       emergency_bypass: false
 
     trajectory:
+      enable: false
       prediction_time: 0.5
       num_points: 10
       integration_dt: 0.01
@@ -51,7 +52,7 @@ ball_detector_node:
       intercept_z: 1.0
       intercept_crossing: "descending"
 
-    world_frame_id: "odom"
+    world_frame_id: "base_link"
     camera_frame_id: "camera_optical_frame"
     air_density: 1.225
     drag_coefficient: 0.47

@@ -81,9 +81,10 @@ public:
 
         declare_parameter<double>("trajectory.prediction_time", 0.5);
         declare_parameter<int>("trajectory.num_points", 10);
+        declare_parameter<bool>("trajectory.enable", false);
 
         // 坐标系与物理参数（用于世界系 TF + 阻力预测）
-        declare_parameter<std::string>("world_frame_id", "odom");
+        declare_parameter<std::string>("world_frame_id", "base_link");
         declare_parameter<std::string>("camera_frame_id", "camera_optical_frame");
 
         declare_parameter<double>("air_density", 1.225);         // kg/m^3
@@ -137,13 +138,21 @@ public:
             }
         }
         const double mass_kg = get_parameter("volleyball.mass_kg").as_double();
-        const double integration_dt = get_parameter("trajectory.integration_dt").as_double();
-        const double max_time = get_parameter("trajectory.max_time").as_double();
-        const double ground_z = get_parameter("trajectory.ground_z").as_double();
+        trajectory_enable_ = get_parameter("trajectory.enable").as_bool();
 
-        trajectory_predictor_ = std::make_unique<TrajectoryPredictor>(
-            gravity, air_density, drag_coefficient, diameter, mass_kg,
-            integration_dt, max_time, ground_z);
+        if (trajectory_enable_) {
+            const double integration_dt =
+                get_parameter("trajectory.integration_dt").as_double();
+            const double max_time = get_parameter("trajectory.max_time").as_double();
+            const double ground_z = get_parameter("trajectory.ground_z").as_double();
+            trajectory_predictor_ = std::make_unique<TrajectoryPredictor>(
+                gravity, air_density, drag_coefficient, diameter, mass_kg,
+                integration_dt, max_time, ground_z);
+            RCLCPP_INFO(get_logger(), "Trajectory prediction: enabled (intercept mode)");
+        } else {
+            RCLCPP_INFO(get_logger(),
+                        "Trajectory prediction: disabled (base_link track mode)");
+        }
 
         position_mode_ = toLower(get_parameter("position.mode").as_string());
         if (position_mode_ != "bbox" && position_mode_ != "depth") {
@@ -848,6 +857,11 @@ private:
         p_in.point.y = pos_cam.y();
         p_in.point.z = pos_cam.z();
 
+        const std::string& source_frame = p_in.header.frame_id;
+        if (source_frame == world_frame_id_) {
+            return pos_cam;
+        }
+
         geometry_msgs::msg::PointStamped p_out;
         try {
             const tf2::Duration timeout = tf2::durationFromSec(0.1);
@@ -970,11 +984,28 @@ private:
         ball_prediction_pub_->publish(msg);
     }
 
+    void publishTrackOutput(const rclcpp::Time& obs_time,
+                            const Eigen::Vector3d& pos_world,
+                            const Eigen::Vector3d& vel_world)
+    {
+        publishBallIntercept(
+            obs_time, pos_world, vel_world, pos_world, 0.0, pos_world.z(), true);
+    }
+
     void publishWorldTrajectory(const rclcpp::Time& obs_time,
                                  const Eigen::Vector3d& pos_world,
                                  const Eigen::Vector3d& vel_world)
     {
-        if (!trajectory_predictor_ || !ball_tracker_->isInitialized()) {
+        if (!ball_tracker_->isInitialized()) {
+            return;
+        }
+
+        if (!trajectory_enable_) {
+            publishTrackOutput(obs_time, pos_world, vel_world);
+            return;
+        }
+
+        if (!trajectory_predictor_) {
             return;
         }
 
@@ -1250,7 +1281,8 @@ private:
         }
         char zbuf[96];
         if (ball_tracker_->isInitialized()) {
-            std::snprintf(zbuf, sizeof(zbuf), "World Z (KF odom): %.3f m", current_z);
+            std::snprintf(zbuf, sizeof(zbuf), "%s Z (KF): %.3f m",
+                          world_frame_id_.c_str(), current_z);
         } else if (has_last_pos_world_) {
             std::snprintf(zbuf, sizeof(zbuf),
                           "World Z: KF off (meas %.2f m)",
@@ -1267,10 +1299,17 @@ private:
 
         if (last_intercept_valid_) {
             char intercept_buf[160];
-            std::snprintf(intercept_buf, sizeof(intercept_buf),
-                          "Intercept: (%.2f,%.2f) z=%.2f in %.2fs",
-                          last_intercept_pos_.x(), last_intercept_pos_.y(),
-                          last_intercept_pos_.z(), last_time_to_event_);
+            if (trajectory_enable_) {
+                std::snprintf(intercept_buf, sizeof(intercept_buf),
+                              "Intercept: (%.2f,%.2f) z=%.2f in %.2fs",
+                              last_intercept_pos_.x(), last_intercept_pos_.y(),
+                              last_intercept_pos_.z(), last_time_to_event_);
+            } else {
+                std::snprintf(intercept_buf, sizeof(intercept_buf),
+                              "Track: (%.2f, %.2f, %.2f) base_link",
+                              last_intercept_pos_.x(), last_intercept_pos_.y(),
+                              last_intercept_pos_.z());
+            }
             cv::putText(debug_img, intercept_buf, cv::Point(10, info_y),
                         cv::FONT_HERSHEY_SIMPLEX, 0.55,
                         cv::Scalar(0, 255, 128), 2);
@@ -1304,6 +1343,7 @@ private:
     std::unique_ptr<DetectionFilter> detection_filter_;
     std::unique_ptr<MultiDetectionTracker> multi_tracker_;
     std::unique_ptr<TrajectoryPredictor> trajectory_predictor_;
+    bool trajectory_enable_{false};
     std::unique_ptr<BallPositionEstimator> position_estimator_;
 
     std::string world_frame_id_;

@@ -1,1 +1,0 @@
-/home/song/volleyball_detection/src/station_detector/launch/static_image_pub.launch.py

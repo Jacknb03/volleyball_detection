@@ -1,1 +1,0 @@
-/home/song/volleyball_detection/src/mindvision_camera/launch/mv_launch.py

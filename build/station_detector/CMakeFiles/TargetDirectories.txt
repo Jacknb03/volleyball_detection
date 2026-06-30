@@ -1,9 +1,0 @@
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/uninstall.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/station_detector_uninstall.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/test.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/edit_cache.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/rebuild_cache.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/list_install_components.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/install.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/install/local.dir
-/home/song/volleyball_detection/build/station_detector/CMakeFiles/install/strip.dir

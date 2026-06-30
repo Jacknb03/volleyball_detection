@@ -1,0 +1,29 @@
+# 固定相机 + base_link 球位 → Stewart（低轨道球面约束）
+# 启动: ros2 launch volleyball_executor executor.launch.py
+intercept_bridge_node:
+  ros__parameters:
+    intercept_topic: "/ball_intercept"
+    target_topic: "/vision/stewart_target"
+    expected_frame_id: "base_link"
+    require_expected_frame: true
+    stale_timeout_sec: 0.6
+    publish_on_invalid: true
+    hold_on_invalid: true
+
+    use_ball_xyz: true              # xyz 来自球在 base_link 的位置（经低轨道约束）
+    fallback_x: 0.0                 # 无球/丢检 hold 时的默认点
+    fallback_y: 0.0
+    fallback_z: 0.27
+
+    # 执行机构假想中心 (x1,y1,z1)，实测后改；约束 (x-x1)^2+(y-y1)^2+(z-z1)^2 与 R
+    workspace_center_x: 0.0
+    workspace_center_y: 0.0
+    workspace_center_z: 0.27
+    workspace_radius: 0.12          # R [m]，低轨道球半径，按机构可达范围标定
+    constrain_workspace_sphere: true
+    sphere_mode: "on_shell"         # on_shell=投影到球面 | inside=限制在球内
+    workspace_max_z: 0.30           # 可选上限 z，不需要可设很大
+
+    default_roll: 0.0
+    aim_from_ball: true             # pitch/yaw：机构中心 → 球
+    use_degrees: false

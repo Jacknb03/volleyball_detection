@@ -295,39 +295,27 @@ flowchart LR
 
 ---
 
-### 4. 坐标系约定
+### 4. 坐标系约定（当前：固定相机 + base_link）
 
 | 帧 | 含义 |
 |----|------|
-| `camera_color_optical_frame` | RealSense 彩色光学系（+Z 朝前，+Y 向下） |
-| `odom` | **固定场地系**（`world_frame_id`），球轨迹应相对它静止（理想情况） |
+| `camera_color_optical_frame` | RealSense 光学系（+Z 朝前，+Y 向下） |
+| **`base_link`** | **底座系**（`world_frame_id`）；相机刚性固定于底盘/立杆 |
 
-**当前开发模式**：launch 用 **static TF** 把 `odom` 和相机绑死 → 相机怎么动，世界系跟着动 → **只适合手持/定点调试**。
-
-**小车上板**（车动、球相对场地不动）需要完整 TF 链，视觉节点**只查 TF、不自己发占位**：
-
-```text
-odom  ──(轮速计/定位)──►  base_link  ──(URDF 标定)──►  camera_link
-                                                      └── RealSense 内置 ──► camera_color_optical_frame
-```
+**当前工控部署**：launch 用 **static TF** 发布 `base_link → camera_link`（标定一次）。球位输出在 **`base_link`**，Stewart 指令同系。
 
 ```bash
-# 关闭占位 static TF，改由底盘/robot_state_publisher 提供 TF
-ros2 launch station_detector_cpp yolo.launch.py \
-  pipeline_mode:=realsense use_static_camera_tf:=false
+ros2 launch station_detector_cpp yolo.launch.py pipeline_mode:=realsense use_static_camera_tf:=true
+# 标定：改 yolo.launch.py 中 static TF 的 x,y,z,rpy
 ```
 
-| 数据源 | 能提供什么 | 能否单独当「世界系」 |
-|--------|------------|-------------------|
-| **轮速里程计** `/odom` | `odom→base_link` 位姿 | ✅ 常用（会漂移） |
-| **URDF / 标定** | `base_link→camera_link` | ✅ 必须 |
-| **RealSense IMU**（D455i 有） | 相机姿态变化、角速度 | ❌ **无位置**；不能替代底盘 odom |
-| **占位 static TF** | 假装相机钉在 odom 上 | ❌ 车一动就错 |
+`trajectory.enable: false` 时 `/ball_intercept` 为 **实时跟踪**（当前球位 + 球速），非弹道 intercept。
 
-RealSense IMU 后续可接 `robot_localization` 做姿态融合，但**球在固定世界系下的轨迹**仍依赖 `odom→base_link`（底盘）。  
-`ball_detector_node` 已通过 `tf_buffer_->lookupTransform(world_frame_id, camera_frame, …)` 接外部 TF，**不必改 C++**，只需换 TF 来源。
+---
 
-yaml：`world_frame_id: "odom"`（或队伍用的 `map`），与底盘约定一致即可。
+### 4.1 历史方案（odom / 里程计，暂不使用）
+
+若恢复移动底盘 + 场地固定系，可改 `world_frame_id: odom` 并接 `odom→base_link` TF。见 git 历史与 `legacy/`。
 
 ---
 
@@ -460,10 +448,21 @@ volleyball_detection/
 ├── config/volleyball_debug.rviz
 ├── scripts/install_realsense_deps.sh
 └── src/
-    └── station_detector_cpp/      # 主包（launch、YAML、算法）
+    ├── station_detector_cpp/      # 视觉：YOLO、深度、KF、/ball_intercept
+    ├── volleyball_msgs/           # StewartControl（与 UC 一致）
+    └── volleyball_executor/       # /ball_intercept → /vision/stewart_target
 ```
 
 RealSense 驱动通过 apt 安装（`scripts/install_realsense_deps.sh`），不在本仓库内 vendoring。
+
+**三包分工**：视觉 → 桥接 → Universal Controllers `volleyball_hub`：
+
+```bash
+./start_all.sh
+ros2 launch volleyball_executor executor.launch.py   # 第二终端
+```
+
+桥接发 **`/vision/stewart_target`**（`volleyball_msgs/StewartControl`），**不要**直连 `/stewart_command`。
 
 ---
 

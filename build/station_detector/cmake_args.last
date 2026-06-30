@@ -1,1 +1,0 @@
-['-DOpenCV_DIR=/usr/local/lib/cmake/opencv4', '-DAMENT_CMAKE_SYMLINK_INSTALL=1']

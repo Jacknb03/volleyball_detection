@@ -50,6 +50,43 @@ TrajectoryPredictor::TrajectoryPredictor(double gravity,
     area_ = pi * r * r;
 }
 
+void TrajectoryPredictor::eulerStep(Eigen::Vector3d& pos, Eigen::Vector3d& vel) const
+{
+    const Eigen::Vector3d gravity(0.0, 0.0, -g_);
+    const double k = (0.5 * rho_ * cd_ * area_) / mass_;
+    const double speed = vel.norm();
+    Eigen::Vector3d a = gravity;
+    if (speed > 1e-6) {
+        a += (-k * speed) * vel;
+    }
+    vel = vel + a * dt_;
+    pos = pos + vel * dt_;
+}
+
+void TrajectoryPredictor::buildVizPath(const Eigen::Vector3d& pos0,
+                                       const Eigen::Vector3d& vel0,
+                                       std::vector<Eigen::Vector3d>& path_points,
+                                       int min_points) const
+{
+    path_points.clear();
+    path_points.push_back(pos0);
+    Eigen::Vector3d pos = pos0;
+    Eigen::Vector3d vel = vel0;
+    const int max_steps = static_cast<int>(std::ceil(max_time_ / dt_));
+    const int target_count = std::max(2, min_points);
+
+    for (int step = 0; step < max_steps; ++step) {
+        eulerStep(pos, vel);
+        path_points.push_back(pos);
+        if (static_cast<int>(path_points.size()) >= target_count && pos.z() <= ground_z_) {
+            break;
+        }
+        if (static_cast<int>(path_points.size()) >= target_count + 30) {
+            break;
+        }
+    }
+}
+
 bool TrajectoryPredictor::predictAtZ(const Eigen::Vector3d& pos0,
                                      const Eigen::Vector3d& vel0,
                                      double target_z,
@@ -72,29 +109,19 @@ bool TrajectoryPredictor::predictAtZ(const Eigen::Vector3d& pos0,
 
     path_points.push_back(pos);
 
-    const Eigen::Vector3d gravity(0.0, 0.0, -g_);
-    const double k = (0.5 * rho_ * cd_ * area_) / mass_;
-
     if (crossedZ(pos.z() + 1e-9, pos.z(), target_z, crossing)) {
         time_to_event = 0.0;
         event_pos = pos;
         event_pos.z() = target_z;
+        buildVizPath(pos0, vel0, path_points);
         return true;
     }
 
     const int max_steps = static_cast<int>(std::ceil(max_time_ / dt_));
     for (int step = 0; step < max_steps; ++step) {
         const Eigen::Vector3d prev_pos = pos;
-        const Eigen::Vector3d prev_vel = vel;
 
-        const double speed = vel.norm();
-        Eigen::Vector3d a = gravity;
-        if (speed > 1e-6) {
-            a += (-k * speed) * vel;
-        }
-
-        vel = prev_vel + a * dt_;
-        pos = prev_pos + vel * dt_;
+        eulerStep(pos, vel);
         t += dt_;
 
         path_points.push_back(pos);
@@ -124,10 +151,10 @@ bool TrajectoryPredictor::predictLanding(const Eigen::Vector3d& pos0,
                                          std::vector<Eigen::Vector3d>& path_points) const
 {
     if (pos0.z() <= ground_z_) {
-        path_points = {pos0};
         time_to_land = 0.0;
         landing_pos = pos0;
         landing_pos.z() = ground_z_;
+        buildVizPath(pos0, vel0, path_points);
         return true;
     }
     return predictAtZ(pos0, vel0, ground_z_, "descending",

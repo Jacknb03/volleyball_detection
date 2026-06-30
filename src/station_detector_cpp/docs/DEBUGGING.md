@@ -66,7 +66,7 @@ ros2 launch station_detector_cpp yolo.launch.py \
 
 `start_all.sh` 会自动加载 `config/volleyball_debug.rviz`：
 
-- **Fixed Frame** = `odom`
+- **Fixed Frame** = `base_link`
 - **Image** → `/debug_image`
 - **MarkerArray** → `/volleyball_trajectory`
 

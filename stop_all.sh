@@ -13,9 +13,11 @@ PATTERNS=(
   'ball_detector_node'
   'video_publisher'
   'realsense2_camera_node'
-  'static_transform_publisher.*--frame-id odom --child-frame-id camera_optical_frame'
-  'static_transform_publisher.*--frame-id odom --child-frame-id camera_color_optical_frame'
-  'static_transform_publisher.*--frame-id odom --child-frame-id camera_link'
+  'static_transform_publisher.*--frame-id base_link --child-frame-id camera_optical_frame'
+  'static_transform_publisher.*--frame-id base_link --child-frame-id camera_color_optical_frame'
+  'static_transform_publisher.*--frame-id base_link --child-frame-id camera_link'
+  'static_transform_publisher.*--frame-id odom --child-frame-id camera'
+  'intercept_bridge_node'
   'rviz2 -d.*volleyball_debug\.rviz'
 )
 
@@ -34,7 +36,7 @@ stop_patterns -9
 
 REMAINING=$(
   pgrep -af \
-    'ros2 launch station_detector_cpp yolo|ball_detector_node|video_publisher|realsense2_camera_node|static_transform_publisher.*--frame-id odom|rviz2 -d.*volleyball_debug' \
+    'ros2 launch station_detector_cpp yolo|ball_detector_node|video_publisher|realsense2_camera_node|static_transform_publisher.*--frame-id (base_link|odom)|intercept_bridge_node|rviz2 -d.*volleyball_debug' \
     2>/dev/null | grep -v pgrep || true
 )
 

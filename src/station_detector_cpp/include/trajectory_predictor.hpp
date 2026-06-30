@@ -66,6 +66,14 @@ public:
                     std::vector<Eigen::Vector3d>& path_points) const;
 
 private:
+    void eulerStep(Eigen::Vector3d& pos, Eigen::Vector3d& vel) const;
+
+    /// RViz LINE_STRIP 至少需要 2 个点；松手假设下积分出可视化轨迹
+    void buildVizPath(const Eigen::Vector3d& pos0,
+                      const Eigen::Vector3d& vel0,
+                      std::vector<Eigen::Vector3d>& path_points,
+                      int min_points = 15) const;
+
     double g_;             // 重力加速度
     double rho_;           // 空气密度
     double cd_;            // 阻力系数

@@ -1,4 +1,0 @@
-Invoking command in '/home/song/volleyball_detection/build/station_detector_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/station_detector_cpp -- -j20 -l20
-Invoked command in '/home/song/volleyball_detection/build/station_detector_cpp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/song/volleyball_detection/build/station_detector_cpp -- -j20 -l20
-Invoking command in '/home/song/volleyball_detection/build/station_detector_cpp': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/station_detector_cpp
-Invoked command in '/home/song/volleyball_detection/build/station_detector_cpp' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/song/volleyball_detection/build/station_detector_cpp

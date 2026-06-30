@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>volleyball_executor</name>
+  <version>0.1.0</version>
+  <description>
+    Bridge from volleyball vision (/ball_intercept) to Universal Controllers Stewart input.
+  </description>
+
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>station_detector_cpp</depend>
+  <depend>volleyball_msgs</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
