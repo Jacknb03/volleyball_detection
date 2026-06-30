@@ -20,12 +20,16 @@
 
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
 #include <optional>
 #include <algorithm>
 #include <cmath>
+
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 #include "yolo_inference.hpp"
 #include "ball_tracker.hpp"
@@ -34,6 +38,51 @@
 #include "ball_position_estimator.hpp"
 
 using std::placeholders::_1;
+
+namespace {
+
+std::string resolveOnnxPath(const std::string& raw, const rclcpp::Logger& logger)
+{
+    namespace fs = std::filesystem;
+    const auto exists = [](const fs::path& p) { return !p.empty() && fs::exists(p); };
+
+    if (raw.empty()) {
+        return raw;
+    }
+
+    const fs::path direct(raw);
+    if (exists(direct)) {
+        return direct.string();
+    }
+
+    try {
+        const fs::path share(
+            ament_index_cpp::get_package_share_directory("station_detector_cpp"));
+        const fs::path ws_root =
+            share.parent_path().parent_path().parent_path().parent_path();
+
+        const std::vector<fs::path> candidates = {
+            share / raw,
+            share / "model" / "best.onnx",
+            share / "model" / direct.filename(),
+            ws_root / "src" / "station_detector_cpp" / "model" / "best.onnx",
+        };
+
+        for (const auto& c : candidates) {
+            if (exists(c)) {
+                RCLCPP_INFO(
+                    logger, "Resolved yolo.model_path -> %s", c.string().c_str());
+                return c.string();
+            }
+        }
+    } catch (const std::exception& e) {
+        RCLCPP_WARN(logger, "resolveOnnxPath failed: %s", e.what());
+    }
+
+    return raw;
+}
+
+}  // namespace
 
 class BallDetectorNode : public rclcpp::Node
 {
@@ -219,7 +268,24 @@ public:
 private:
     void initYolo()
     {
-        auto model_path   = get_parameter("yolo.model_path").as_string();
+        auto model_path =
+            resolveOnnxPath(get_parameter("yolo.model_path").as_string(), get_logger());
+        if (model_path.empty() || !std::filesystem::exists(model_path)) {
+            throw std::runtime_error(
+                "ONNX model not found: '" + model_path +
+                "'. Put best.onnx in src/station_detector_cpp/model/ or pass "
+                "model_path:=/abs/path/best.onnx");
+        }
+        {
+            std::error_code ec;
+            const auto bytes = std::filesystem::file_size(model_path, ec);
+            if (!ec) {
+                RCLCPP_INFO(
+                    get_logger(), "Loading ONNX: %s (%.1f MB)",
+                    model_path.c_str(), static_cast<double>(bytes) / (1024.0 * 1024.0));
+            }
+        }
+
         auto model_type   = get_parameter("yolo.model_type").as_string();
         auto conf_th      = static_cast<float>(get_parameter("yolo.conf_threshold").as_double());
         auto iou_th       = static_cast<float>(get_parameter("yolo.iou_threshold").as_double());

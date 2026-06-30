@@ -50,6 +50,13 @@ MODEL_PATH="${MODEL_PATH:-$DEFAULT_MODEL}"
 FRAME_RATE="${FRAME_RATE:-15.0}"
 YOLO_DEVICE="${YOLO_DEVICE:-auto}"
 
+if [[ ! -f "$MODEL_PATH" ]]; then
+  echo "错误: YOLO 模型不存在: $MODEL_PATH"
+  echo "请把 best.onnx 放到 src/station_detector_cpp/model/ 或设置 MODEL_PATH"
+  exit 1
+fi
+echo "YOLO 模型: $MODEL_PATH ($(du -h "$MODEL_PATH" | cut -f1))"
+
 LAUNCH_CMD="ros2 launch station_detector_cpp yolo.launch.py \
   pipeline_mode:=$PIPELINE_MODE \
   model_path:=$MODEL_PATH \

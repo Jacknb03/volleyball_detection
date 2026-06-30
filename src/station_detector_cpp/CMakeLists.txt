@@ -20,6 +20,7 @@ find_package(Eigen3 REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 # ---- 头文件目录 ----
 include_directories(
@@ -57,6 +58,7 @@ ament_target_dependencies(ball_detector_node
   tf2
   tf2_ros
   tf2_geometry_msgs
+  ament_index_cpp
 )
 
 target_link_libraries(ball_detector_node

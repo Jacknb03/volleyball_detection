@@ -22,6 +22,26 @@ from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
+def _resolve_model_path(cpp_share: str, override: str) -> str:
+    if override and os.path.isfile(override):
+        return override
+    candidates = [
+        os.path.join(cpp_share, "model", "best.onnx"),
+        os.path.join(cpp_share, override) if override else "",
+    ]
+    # install/share/.../station_detector_cpp -> ws/src/.../model/best.onnx
+    ws_root = os.path.abspath(
+        os.path.join(cpp_share, "..", "..", "..", "..")
+    )
+    candidates.append(
+        os.path.join(ws_root, "src", "station_detector_cpp", "model", "best.onnx")
+    )
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+    return override or os.path.join(cpp_share, "model", "best.onnx")
+
+
 def _setup(context, *args, **kwargs):
     cpp_share = FindPackageShare("station_detector_cpp").find("station_detector_cpp")
     mode = LaunchConfiguration("pipeline_mode").perform(context).strip().lower()
@@ -35,7 +55,17 @@ def _setup(context, *args, **kwargs):
     )
 
     default_model = os.path.join(cpp_share, "model", "best.onnx")
-    model_path = LaunchConfiguration("model_path").perform(context) or default_model
+    override = LaunchConfiguration("model_path").perform(context).strip()
+    model_path = _resolve_model_path(cpp_share, override)
+    if not os.path.isfile(model_path):
+        ws_src = os.path.join(
+            os.path.abspath(os.path.join(cpp_share, "..", "..", "..", "..")),
+            "src", "station_detector_cpp", "model", "best.onnx",
+        )
+        raise RuntimeError(
+            f"ONNX model not found: {model_path!r}. "
+            f"Put best.onnx at {ws_src} or pass model_path:=/abs/path/best.onnx"
+        )
     yolo_device = LaunchConfiguration("yolo_device").perform(context)
 
     params_override = LaunchConfiguration("params_file").perform(context)

@@ -1,0 +1,41 @@
+#!/bin/bash
+# 工控机部署自检 — bash scripts/check_deploy.sh
+set -eo pipefail
+
+WS="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$WS"
+
+source /opt/ros/humble/setup.bash
+source install/setup.bash 2>/dev/null || {
+  echo "FAIL: 先 colcon build"
+  exit 1
+}
+
+MODEL="$WS/src/station_detector_cpp/model/best.onnx"
+INSTALL_MODEL="$(ros2 pkg prefix station_detector_cpp)/share/station_detector_cpp/model/best.onnx"
+
+echo "=== 模型 ==="
+for p in "$MODEL" "$INSTALL_MODEL"; do
+  if [[ -f "$p" ]]; then
+    echo "OK  $p ($(du -h "$p" | cut -f1))"
+  else
+    echo "MISS $p"
+  fi
+done
+
+echo ""
+echo "=== 节点（需先 ./start_all.sh）==="
+pgrep -af 'ball_detector|realsense2_camera|static_transform.*base_link' | head -5 || echo "无相关进程"
+
+echo ""
+echo "=== 话题 ==="
+timeout 3 ros2 topic hz /camera/camera/color/image_raw 2>&1 | head -2 || echo "无彩色图"
+timeout 3 ros2 topic hz /ball_intercept 2>&1 | head -2 || echo "无 ball_intercept（KF 未激活或无检测）"
+
+echo ""
+echo "=== TF base_link -> camera_color_optical_frame ==="
+timeout 4 ros2 run tf2_ros tf2_echo base_link camera_color_optical_frame 2>&1 | head -6 || true
+
+echo ""
+echo "提示: base_link 仅由 yolo.launch.py 里的 static_transform_publisher 发布；"
+echo "      勿单独起 realsense。无检测先看 ball_detector 日志里的 Loading ONNX 与 Depth/TF。"
