@@ -1,81 +1,48 @@
 #!/bin/bash
-# 启动视觉 + 可选 RViz（工控机有桌面时用 gnome-terminal；否则前台运行）
-set -euo pipefail
+# 启动视觉 + 可选 RViz
+set -eo pipefail
 
 WS_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RVIZ_CONFIG="${RVIZ_CONFIG:-$WS_PATH/config/volleyball_debug.rviz}"
 PIPELINE_CONF="${PIPELINE_CONF:-$WS_PATH/config/pipeline.conf}"
 USE_RVIZ="${USE_RVIZ:-true}"
 
-if [[ -f "$PIPELINE_CONF" ]]; then
-  set +u
-  # shellcheck disable=SC1090
-  source "$PIPELINE_CONF"
-  set -u 2>/dev/null || true
-fi
-
-# shellcheck disable=SC1091
-source "$WS_PATH/scripts/ros_env.sh"
-
-if [[ -z "${PIPELINE_MODE:-}" ]]; then
-  if [[ "${USE_REALSENSE:-false}" == "true" ]]; then
-    PIPELINE_MODE=realsense
-  else
-    PIPELINE_MODE=video
-  fi
-fi
-
-export PIPELINE_MODE
-export MODEL_PATH="${MODEL_PATH:-$WS_PATH/src/station_detector_cpp/model/best.onnx}"
-export VIDEO_PATH="${VIDEO_PATH:-$WS_PATH/src/station_detector_cpp/videos/test.mp4}"
-export FRAME_RATE="${FRAME_RATE:-15.0}"
-export YOLO_DEVICE="${YOLO_DEVICE:-cpu}"
-export RVIZ_CONFIG
-
-if [[ ! -f "$MODEL_PATH" ]]; then
-  echo "错误: YOLO 模型不存在: $MODEL_PATH"
-  echo "请把 best.onnx 放到 src/station_detector_cpp/model/ 或设置 MODEL_PATH"
+if [[ ! -f "$WS_PATH/scripts/launch_vision.sh" ]]; then
+  echo "错误: 缺少 scripts/launch_vision.sh"
   exit 1
 fi
 
-echo "YOLO 模型: $MODEL_PATH ($(du -h "$MODEL_PATH" | cut -f1))"
-echo "模式: $PIPELINE_MODE | 设备: $YOLO_DEVICE | RViz: $USE_RVIZ"
+if [[ ! -f "$WS_PATH/src/station_detector_cpp/model/best.onnx" ]]; then
+  echo "错误: 缺少 best.onnx → src/station_detector_cpp/model/"
+  exit 1
+fi
+
+echo "=== 排球视觉启动 ==="
 echo "配置: $PIPELINE_CONF"
-echo ""
-echo "调试（无需 source）:"
-echo "  ./run.sh ros2 topic echo /ball_intercept --once"
-echo "  ./start_executor.sh"
+echo "RViz: $USE_RVIZ（画面来自 ball_detector 的 /debug_image，不是原始相机话题）"
 echo ""
 
 VISION_SCRIPT="$WS_PATH/scripts/launch_vision.sh"
 RVIZ_SCRIPT="$WS_PATH/scripts/launch_rviz.sh"
 
-use_gnome=false
+# 与桌面/SSH 无关：有 DISPLAY 且 gnome-terminal 可用 → 开新 tab；否则当前终端前台跑
 if command -v gnome-terminal >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
-  use_gnome=true
-fi
-
-if $use_gnome; then
-  echo "使用 gnome-terminal 启动..."
-  if ! gnome-terminal --tab --title="Volleyball_${PIPELINE_MODE}" -- \
-      bash -lc "'$VISION_SCRIPT'; exec bash"; then
-    echo "警告: gnome-terminal 失败，改前台启动。"
-    use_gnome=false
-  elif [[ "${USE_RVIZ}" == "true" ]]; then
+  echo "→ gnome-terminal 启动视觉 tab..."
+  gnome-terminal --tab --title="Volleyball" -- \
+    env PIPELINE_CONF="$PIPELINE_CONF" WS_PATH="$WS_PATH" bash "$VISION_SCRIPT" || {
+    echo "gnome-terminal 失败，改前台启动"
+    exec env PIPELINE_CONF="$PIPELINE_CONF" WS_PATH="$WS_PATH" bash "$VISION_SCRIPT"
+  }
+  if [[ "${USE_RVIZ}" == "true" ]]; then
+    echo "→ gnome-terminal 启动 RViz tab..."
     gnome-terminal --tab --title="RViz2" -- \
-      bash -lc "'$RVIZ_SCRIPT'; exec bash" || echo "警告: RViz 标签页未打开（可忽略）。"
+      env RVIZ_CONFIG="$RVIZ_CONFIG" WS_PATH="$WS_PATH" bash "$RVIZ_SCRIPT" || true
   fi
-  if $use_gnome; then
-    echo "已在 gnome-terminal 中启动。"
-    exit 0
-  fi
+  echo "已提交到 gnome-terminal。请查看 Volleyball tab 是否有 launch 输出。"
+  echo "验证: ./run.sh ros2 topic hz /camera/camera/color/image_raw"
+  echo "      ./run.sh ros2 topic hz /debug_image"
+  exit 0
 fi
 
-if [[ -z "${DISPLAY:-}" ]]; then
-  echo "未检测到 DISPLAY（SSH 远程登录？）。改为本终端前台启动视觉节点。"
-  echo "若要在工控机本机桌面启动，请在本机图形终端里运行 ./start_all.sh"
-  echo ""
-fi
-
-echo "前台启动视觉 launch（Ctrl+C 停止）..."
-exec "$VISION_SCRIPT"
+echo "→ 当前终端前台启动（SSH 或无 gnome-terminal 时正常）..."
+exec env PIPELINE_CONF="$PIPELINE_CONF" WS_PATH="$WS_PATH" bash "$VISION_SCRIPT"
