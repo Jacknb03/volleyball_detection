@@ -111,7 +111,8 @@ source install/setup.bash
 #   "OpenCV CUDA detected" → 可用 cuda
 #   "OpenCV CUDA not found" → 只能 CPU
 
-ros2 launch station_detector_cpp yolo_cpp_video.launch.py \
+ros2 launch station_detector_cpp yolo.launch.py \
+  pipeline_mode:=video \
   yolo_device:=cuda \
   frame_rate:=15
 ```
@@ -152,7 +153,7 @@ colcon build --symlink-install --packages-select station_detector_cpp
 运行：
 
 ```bash
-ros2 launch station_detector_cpp yolo_cpp_video.launch.py yolo_device:=cuda
+ros2 launch station_detector_cpp yolo.launch.py pipeline_mode:=video yolo_device:=cuda
 ```
 
 ### 1.4 路径 B：Jetson 部署（推荐上机方案）
@@ -471,8 +472,7 @@ yolo export model=runs/detect/train/weights/best.pt format=onnx imgsz=416 opset=
 ```
 
 ⚠️ 导出 **416** 后须把 `yolo_inference.cpp` 里 `inp_w/inp_h` 改为 **416**（或后续做成 yaml 参数）。  
-更完整的数据集说明见 [MODEL_TRAINING_BRIEF.md](MODEL_TRAINING_BRIEF.md)（**可直接转发给训模型同学**）。  
-简要命令见下；细节见 [legacy/TRAINING_GUIDE.md](../legacy/TRAINING_GUIDE.md)。
+更完整的数据集说明见 [MODEL_TRAINING_BRIEF.md](MODEL_TRAINING_BRIEF.md)（**可直接转发给训模型同学**）。
 
 **训练注意：**
 
@@ -543,9 +543,7 @@ A: YOLOv8n @416 重训 + OpenVINO；仍不够则视觉专机或等跳帧/ROI 功
 | `config/pipeline.conf` | `USE_REALSENSE` / `YOLO_DEVICE` 一键切换 |
 | `src/station_detector_cpp/config/ball_detector_params_video.yaml` | 视频 bbox 模式参数 |
 | `src/station_detector_cpp/config/ball_detector_params_realsense.yaml` | RealSense depth 模式参数 |
-| `launch/yolo.launch.py` | **统一入口**（`pipeline_mode` 或读 `USE_REALSENSE`） |
-| `launch/yolo_cpp_video.launch.py` | 旧入口（仍可用） |
-| `launch/yolo_cpp_realsense.launch.py` | 旧入口（仍可用） |
+| `launch/yolo.launch.py` | **统一入口**（`pipeline_mode:=video\|realsense` 或 `./start_all.sh`） |
 | `src/ball_detector_node.cpp` | 双模式主节点 |
 | `src/ball_tracker.cpp` | 6 状态卡尔曼 |
 | `src/trajectory_predictor.cpp` | 重力 + 二次阻力积分 |

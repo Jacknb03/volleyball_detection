@@ -315,7 +315,7 @@ ros2 launch station_detector_cpp yolo.launch.py pipeline_mode:=realsense use_sta
 
 ### 4.1 历史方案（odom / 里程计，暂不使用）
 
-若恢复移动底盘 + 场地固定系，可改 `world_frame_id: odom` 并接 `odom→base_link` TF。见 git 历史与 `legacy/`。
+若恢复移动底盘 + 场地固定系，可改 `world_frame_id: odom` 并接 `odom→base_link` TF（见 git 历史）。
 
 ---
 

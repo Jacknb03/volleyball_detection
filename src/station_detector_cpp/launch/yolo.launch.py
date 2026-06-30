@@ -88,7 +88,9 @@ def _setup(context, *args, **kwargs):
                 {
                     "video_path": LaunchConfiguration("video_path"),
                     "loop": LaunchConfiguration("loop"),
-                    "frame_rate": LaunchConfiguration("frame_rate"),
+                    "frame_rate": ParameterValue(
+                        LaunchConfiguration("frame_rate"), value_type=float
+                    ),
                 }
             ],
         )

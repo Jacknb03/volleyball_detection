@@ -8,8 +8,6 @@ echo "正在关闭排球检测相关节点..."
 # 按优先级：先停 launch 监督进程，再停各节点（避免 launch 还在时子进程被拉起）
 PATTERNS=(
   'ros2 launch station_detector_cpp yolo\.launch\.py'
-  'ros2 launch station_detector_cpp yolo_cpp_video\.launch\.py'
-  'ros2 launch station_detector_cpp yolo_cpp_realsense\.launch\.py'
   'ball_detector_node'
   'video_publisher'
   'realsense2_camera_node'
