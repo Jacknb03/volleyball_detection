@@ -1,15 +1,10 @@
 #!/bin/bash
-# 工控机部署自检 — bash scripts/check_deploy.sh
+# 工控机部署自检 — bash scripts/check_deploy.sh  或  ./run.sh bash scripts/check_deploy.sh
 set -eo pipefail
 
 WS="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$WS"
-
-source /opt/ros/humble/setup.bash
-source install/setup.bash 2>/dev/null || {
-  echo "FAIL: 先 colcon build"
-  exit 1
-}
+# shellcheck disable=SC1091
+source "$WS/scripts/ros_env.sh"
 
 MODEL="$WS/src/station_detector_cpp/model/best.onnx"
 INSTALL_MODEL="$(ros2 pkg prefix station_detector_cpp)/share/station_detector_cpp/model/best.onnx"
@@ -37,5 +32,4 @@ echo "=== TF base_link -> camera_color_optical_frame ==="
 timeout 4 ros2 run tf2_ros tf2_echo base_link camera_color_optical_frame 2>&1 | head -6 || true
 
 echo ""
-echo "提示: base_link 仅由 yolo.launch.py 里的 static_transform_publisher 发布；"
-echo "      勿单独起 realsense。无检测先看 ball_detector 日志里的 Loading ONNX 与 Depth/TF。"
+echo "提示: 用 ./start_all.sh 启动（已自动 source）；调试请 ./run.sh ros2 ..."

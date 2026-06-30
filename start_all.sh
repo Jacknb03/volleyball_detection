@@ -1,14 +1,6 @@
 #!/bin/bash
 set -eo pipefail
 
-ros_source() {
-  set +u
-  source /opt/ros/humble/setup.bash
-  cd "$WS_PATH"
-  source install/setup.bash
-  set -u 2>/dev/null || true
-}
-
 WS_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RVIZ_CONFIG="${RVIZ_CONFIG:-$WS_PATH/config/volleyball_debug.rviz}"
 PIPELINE_CONF="${PIPELINE_CONF:-$WS_PATH/config/pipeline.conf}"
@@ -21,17 +13,8 @@ if [[ -f "$PIPELINE_CONF" ]]; then
   set -u 2>/dev/null || true
 fi
 
-ros_source
-
-CUDNN_LIB="${CUDNN_LIB:-$HOME/opencv_build/cudnn/lib}"
-if [[ -f /usr/local/lib/libopencv_dnn.so ]]; then
-  export LD_LIBRARY_PATH="/usr/local/lib:$CUDNN_LIB:${LD_LIBRARY_PATH:-}"
-else
-  OPENCV_CUDA_LIB="${OPENCV_CUDA_LIB:-$HOME/opencv_build/opencv/build_cuda/lib}"
-  if [[ -d "$OPENCV_CUDA_LIB" ]]; then
-    export LD_LIBRARY_PATH="$CUDNN_LIB:$OPENCV_CUDA_LIB:${LD_LIBRARY_PATH:-}"
-  fi
-fi
+# shellcheck disable=SC1091
+source "$WS_PATH/scripts/ros_env.sh"
 
 # USE_REALSENSE=true → realsense；否则 video（命令行 PIPELINE_MODE 仍可覆盖）
 if [[ -z "${PIPELINE_MODE:-}" ]]; then
@@ -82,15 +65,17 @@ echo ""
 echo "Launch: $LAUNCH_CMD"
 echo "RViz:   $RVIZ_CMD"
 echo ""
-echo "改模式: 编辑 config/pipeline.conf → USE_REALSENSE=true/false"
-echo "改 GPU:  编辑 config/pipeline.conf → YOLO_DEVICE=cuda"
+echo "另开终端调试（无需 source）:"
+echo "  ./run.sh ros2 topic echo /ball_intercept --once"
+echo "  ./start_executor.sh   # Stewart 桥接"
 echo ""
 
+ENV_SNIPPET="set +u; source '$WS_PATH/scripts/ros_env.sh'; set -u 2>/dev/null || true"
+
 if command -v gnome-terminal >/dev/null 2>&1; then
-  RUN_PREFIX="set +u; source /opt/ros/humble/setup.bash; cd '$WS_PATH'; source install/setup.bash; set -u 2>/dev/null || true; export LD_LIBRARY_PATH='${LD_LIBRARY_PATH:-}'; "
-  gnome-terminal --tab --title="Volleyball_${PIPELINE_MODE}" -- bash -c "${RUN_PREFIX} ${LAUNCH_CMD}; exec bash"
-  gnome-terminal --tab --title="RViz2" -- bash -c "${RUN_PREFIX} ${RVIZ_CMD}; exec bash"
+  gnome-terminal --tab --title="Volleyball_${PIPELINE_MODE}" -- bash -c "${ENV_SNIPPET} ${LAUNCH_CMD}; exec bash"
+  gnome-terminal --tab --title="RViz2" -- bash -c "${ENV_SNIPPET} ${RVIZ_CMD}; exec bash"
 else
   echo "未检测到 gnome-terminal，改为前台启动。"
-  bash -c "$LAUNCH_CMD"
+  exec bash -c "$LAUNCH_CMD"
 fi
