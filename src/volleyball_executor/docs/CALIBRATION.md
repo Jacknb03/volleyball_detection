@@ -28,6 +28,8 @@ sphere_mode: "on_shell"
 
 ## 3. 联调顺序
 
+完整检查清单（命令 + 预期值）：**[INTEGRATION_CHECKLIST.md](INTEGRATION_CHECKLIST.md)**
+
 1. 仅视觉：`ros2 topic echo /ball_intercept`  
 2. 开桥接：`ros2 topic echo /vision/stewart_target`  
 3. CH7 视觉模式，观察 xyz 是否在球面附近、pitch/yaw 是否跟球  

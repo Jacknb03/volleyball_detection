@@ -41,13 +41,31 @@ flowchart LR
   PHY --> OUT["volleyball_pose / ball_intercept"]
 ```
 
+### 三包分工（节点与通信）
+
+| 包 | 节点 | 职责 |
+|----|------|------|
+| **`station_detector_cpp`** | `ball_detector_node`（+ RealSense / `video_publisher`） | 检测、深度、**TF→`base_link`**、KF；发 `/ball_intercept` |
+| **`volleyball_executor`** | `intercept_bridge_node` | 收 `/ball_intercept` → 低轨道球面约束 → `/vision/stewart_target` |
+| **`volleyball_msgs`** | （无 node，仅 `.msg`） | `StewartControl` 等消息类型，与 UC 对齐 |
+
+```text
+相机 → ball_detector_node → /ball_intercept
+                              ↓
+                    intercept_bridge_node → /vision/stewart_target
+                              ↓
+              UC volleyball_hub → /stewart_command → Stewart 电机
+```
+
+`volleyball_msgs` 不是节点，是**消息格式定义**（类似结构体声明）。联调步骤见 [INTEGRATION_CHECKLIST.md](src/volleyball_executor/docs/INTEGRATION_CHECKLIST.md)。
+
 ### 实现思路（概要）
 
 | 阶段 | 做什么 |
 |------|--------|
 | **2D 检测** | OpenCV DNN 加载 ONNX，输出排球 bbox |
 | **3D 位置** | **bbox**：针孔模型由框高估深；**depth**：对齐深度图中值采样 |
-| **坐标变换** | 相机光学系 → `odom`（静态 TF 占位，上机器人后换 URDF） |
+| **坐标变换** | 相机光学系 → `base_link`（静态 TF 占位，上机器人后实测标定） |
 | **时序滤波** | 6 状态卡尔曼（位置+速度），丢帧预测、速度门控 |
 | **轨迹预测** | 重力 + **二次空气阻力**，半隐式欧拉数值积分至落地 |
 
@@ -424,17 +442,18 @@ bash scripts/install_realsense_deps.sh   # 首次
 ```bash
 USE_REALSENSE=false    # 视频 + bbox 估深
 USE_REALSENSE=true     # RealSense D455i + 深度
-YOLO_DEVICE=cuda       # GPU 推理
+YOLO_DEVICE=cpu        # 工控机无显卡用 cpu；有 NVIDIA 可 cuda
+YOLO_INPUT_SIZE=416    # 1260P CPU 建议 416 + best_416.onnx
 ```
 
 | | **video** | **realsense** |
 |--|-----------|---------------|
 | 配置 | `USE_REALSENSE=false` | `USE_REALSENSE=true` |
-| YAML | `src/station_detector_cpp/config/ball_detector_params_video.yaml` | `.../ball_detector_params_realsense.yaml` |
+| YAML | `ball_detector_params_video.yaml` | `ball_detector_params_realsense.yaml`（416 用 `..._realsense_416.yaml`） |
 | 3D 模式 | `position.mode: bbox` | `position.mode: depth` |
-| 状态 | ✅ 已验证 | ✅ 驱动/话题已通；有球时 pose/轨迹待测 |
+| 状态 | ✅ 已验证 | ✅ 工控机 CPU@416 已跑通 |
 
-命令行仍可临时覆盖：`YOLO_DEVICE=cpu ./start_all.sh`
+工控机改 C++ 后在本机编译：`bash scripts/rebuild_ipc.sh`（勿只拷开发机 `install/`）。
 
 ---
 
@@ -442,11 +461,16 @@ YOLO_DEVICE=cuda       # GPU 推理
 
 ```
 volleyball_detection/
-├── config/pipeline.conf           # USE_REALSENSE / YOLO_DEVICE
-├── start_all.sh                 # 读 pipeline.conf，自动选 video|realsense
+├── config/pipeline.conf           # USE_REALSENSE / YOLO_DEVICE / YOLO_INPUT_SIZE
+├── start_all.sh                 # 视觉 + RViz（不含 executor / UC）
 ├── stop_all.sh
-├── config/volleyball_debug.rviz
-├── scripts/install_realsense_deps.sh
+├── run.sh                       # 免手敲 source 跑 ros2 命令
+├── config/volleyball_debug.rviz # debug 图 + 3D 球点 Marker
+├── scripts/
+│   ├── install_realsense_deps.sh
+│   ├── rebuild_ipc.sh           # 工控机本地 colcon（避免坏 symlink）
+│   ├── rebuild_vision_opencv411.sh
+│   └── rebuild_cv_bridge_opencv411.sh
 └── src/
     ├── station_detector_cpp/      # 视觉：YOLO、深度、KF、/ball_intercept
     ├── volleyball_msgs/           # StewartControl（与 UC 一致）
@@ -473,8 +497,11 @@ ros2 launch volleyball_executor executor.launch.py   # 第二终端
 ```bash
 USE_REALSENSE=false|true
 YOLO_DEVICE=auto|cpu|cuda
+YOLO_INPUT_SIZE=640|416
 VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 ```
+
+`start_all.sh` 在无 `nvidia-smi` 时自动 `YOLO_DEVICE=cpu`；`YOLO_INPUT_SIZE=416` 时自动选 `best_416.onnx` 与 416 yaml。
 
 ---
 
@@ -485,11 +512,13 @@ VIDEO_PATH=...    MODEL_PATH=...    FRAME_RATE=15.0
 
 | 话题 | 类型 | 下游用途 |
 |------|------|----------|
-| **`/ball_intercept`** | `station_detector_cpp/VolleyballIntercept` | **主输出**：拦截点、球速、`time_to_event`、`event_time`（小车规划用） |
-| `/volleyball_pose` | `geometry_msgs/PoseStamped` | KF 滤波后当前 3D 位姿 |
-| `/volleyball_trajectory` | `visualization_msgs/MarkerArray` | RViz 预测轨迹 |
-| `/debug_image` | `sensor_msgs/Image` | 检测框与状态叠加 |
-| `/ball_prediction` | `geometry_msgs/Point` | **兼容**：x,y=拦截点，z=Δt；无 header，新工程请用 `/ball_intercept` |
+| **`/ball_intercept`** | `station_detector_cpp/VolleyballIntercept` | **主输出**（`trajectory.enable:false` 时为实时球位+球速） |
+| `/vision/stewart_target` | `volleyball_msgs/StewartControl` | **桥接输出** → UC `volleyball_hub` |
+| `/volleyball_pose` | `geometry_msgs/PoseStamped` | KF 滤波后当前 3D 位姿（`base_link`） |
+| `/volleyball_ball_marker` | `visualization_msgs/Marker` | RViz 3D 红点（KF 有效时） |
+| `/volleyball_trajectory` | `visualization_msgs/MarkerArray` | RViz 预测轨迹（默认关闭） |
+| `/debug_image` | `sensor_msgs/Image` | 检测框叠加（默认 ~12Hz 限频） |
+| `/ball_prediction` | `geometry_msgs/Point` | **兼容**旧接口 |
 | `/ball_state` | `geometry_msgs/Point` | 调试：当前位置 |
 
 **yaml 拦截高度**（`ball_detector_params_*.yaml`）：
@@ -508,8 +537,10 @@ trajectory:
 ## 文档
 
 - [README.md](README.md) — 架构、**方法论与数学模型**、快速开始
+- [INTEGRATION_CHECKLIST.md](src/volleyball_executor/docs/INTEGRATION_CHECKLIST.md) — **视觉→UC 联调清单**
 - [DEBUGGING.md](src/station_detector_cpp/docs/DEBUGGING.md) — 分层排查
 - [DEPLOYMENT.md](src/station_detector_cpp/docs/DEPLOYMENT.md) — CUDA / RealSense / 1260P·EtherCAT / 无显卡优化
+- [CALIBRATION.md](src/volleyball_executor/docs/CALIBRATION.md) — 相机 TF、低轨道球心/R
 - [MODEL_TRAINING_BRIEF.md](src/station_detector_cpp/docs/MODEL_TRAINING_BRIEF.md) — **给队友的练模型需求单**
 - [readme.md](src/station_detector_cpp/readme.md) — **参数调优速查**（现象 → 旋钮）
 
@@ -517,17 +548,14 @@ trajectory:
 
 ## 进度与后续
 
-**已完成：** 视频链路、bbox 估深、KF、轨迹、CUDA 可选、统一模式切换、RViz 可视化、RealSense 驱动与话题
+**已完成：** 视频/RealSense 链路、KF、YOLO@416 CPU、RViz 3D 球点、debug 限频、executor 桥接、工控机编译脚本
 
 **待做：**
 
-1. RealSense + 真球 — `USE_REALSENSE=true ./start_all.sh`，验证 `/volleyball_pose` 与 depth 精度
-2. 替换占位 static TF → 机器人 URDF / 标定
-3. 定比赛主控：**Jetson** 或 **1260P 工控机**（见 DEPLOYMENT §五）+ 无显卡则 **YOLOv8n 小模型**（§六）
-4. fps 优化：OpenVINO / 跳帧 ROI（可选，当前 PC CUDA 约 6–8 Hz pose）
-5. 下游机构（EtherCAT 控制机）对接 **`/ball_intercept`**（或兼容 `/ball_prediction`）
-
-建议：**先 D455i 有球实测 → 与队友定单机/双机架构 → 再训小模型上 1260P。**
+1. `camera_link` / 低轨道球心 **实测标定**（见 CALIBRATION.md）
+2. 与 UC 联调：`executor.launch.py` + CH7 视觉模式
+3. fps 进一步优化：OpenVINO（可选）
+4. 下游完整击球时序与颠球对接
 
 ---
 

@@ -1,14 +1,15 @@
-# RealSense D455i RGB-D：对齐深度采样模式
-# 启动: USE_REALSENSE=true ./start_all.sh
+# RealSense + YOLO @416（1260P CPU 提速用）
+# 需 model/best_416.onnx；启动: YOLO_INPUT_SIZE=416 ./start_all.sh
 ball_detector_node:
   ros__parameters:
     yolo:
-      model_path: "model/best.onnx"
+      model_path: "model/best_416.onnx"
       model_type: "yolov8"
       conf_threshold: 0.18
       iou_threshold: 0.45
       device: "auto"
-      detect_min_interval_sec: 0.10   # YOLO 最短间隔 [s]；0=每帧检测。中间帧 KF 按真实 dt 预测
+      input_size: 416
+      detect_min_interval_sec: 0.10
       volleyball_classes:
         - "volleyball"
         - "Volleyball"
@@ -20,18 +21,18 @@ ball_detector_node:
     position:
       mode: "depth"
       depth_topic: "/camera/camera/aligned_depth_to_color/image_raw"
-      depth_sync_stamp: false           # YOLO 慢时用最新对齐深度，不按 RGB 时间戳拒采
-      depth_max_stamp_delta_sec: 0.30   # 仅 depth_sync_stamp: true 时生效
-      depth_inner_ratio: 0.5            # 检测框中心 50% 宽高（黄框）；越小采样区越小
-      depth_min_m: 0.15             # 举近相机时 <0.3m 也会被拒
+      depth_sync_stamp: false
+      depth_max_stamp_delta_sec: 0.30
+      depth_inner_ratio: 0.5
+      depth_min_m: 0.15
       depth_max_m: 8.0
-      depth_patch_radius: 2             # 保留兼容；实际采样用 depth_inner_ratio
+      depth_patch_radius: 2
 
     kalman:
       process_noise: 0.05
       measurement_noise: 50.0
       initial_uncertainty: 10.0
-      max_missing_frames: 25            # 短暂盲区多撑一会儿
+      max_missing_frames: 25
 
     detection:
       max_jump_distance: 100.0
@@ -39,22 +40,22 @@ ball_detector_node:
       max_detections: 3
       selection_method: "confidence"
       min_confidence: 0.18
-      use_tracker: false              # 多黄框时直接取 conf 最高
+      use_tracker: false
       h_ema_alpha: 0.3
       max_physical_speed: 25.0
       emergency_bypass: false
 
     trajectory:
-      enable: false                   # false=车体系实时跟踪；true=弹道拦截预测
+      enable: false
       prediction_time: 0.5
       num_points: 10
       integration_dt: 0.01
       max_time: 5.0
       ground_z: 0.0
-      intercept_z: 1.0                # 仅 enable:true 时生效
+      intercept_z: 1.0
       intercept_crossing: "descending"
 
-    world_frame_id: "base_link"       # 固定相机：static TF 标定后球位在 base_link
+    world_frame_id: "base_link"
     camera_frame_id: "camera_color_optical_frame"
     air_density: 1.225
     drag_coefficient: 0.47

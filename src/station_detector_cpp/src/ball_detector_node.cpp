@@ -96,6 +96,7 @@ public:
         declare_parameter<double>("yolo.conf_threshold", 0.5);
         declare_parameter<double>("yolo.iou_threshold", 0.45);
         declare_parameter<std::string>("yolo.device", "auto");
+        declare_parameter<int>("yolo.input_size", 640);
         declare_parameter<double>("yolo.detect_min_interval_sec", 0.1);
         declare_parameter<std::vector<std::string>>("yolo.volleyball_classes",
                                                     std::vector<std::string>{"sports ball", "ball"});
@@ -148,6 +149,7 @@ public:
         declare_parameter<bool>("debug.enable", true);
         declare_parameter<bool>("debug.show_fps", true);
         declare_parameter<bool>("debug.draw_trajectory", true);
+        declare_parameter<double>("debug.max_publish_hz", 12.0);
 
         declare_parameter<double>("volleyball.real_radius", 0.105);
         declare_parameter<double>("volleyball.min_depth", 0.3);
@@ -249,8 +251,13 @@ public:
         traj_pub_ = create_publisher<visualization_msgs::msg::MarkerArray>(
             "/volleyball_trajectory", 10);
 
+        ball_marker_pub_ = create_publisher<visualization_msgs::msg::Marker>(
+            "/volleyball_ball_marker", 10);
+
+        rclcpp::QoS debug_qos(rclcpp::KeepLast(1));
+        debug_qos.best_effort();
         debug_pub_ = create_publisher<sensor_msgs::msg::Image>(
-            "/debug_image", 10);
+            "/debug_image", debug_qos);
 
         ball_state_pub_ = create_publisher<geometry_msgs::msg::Point>(
             "/ball_state", 10);
@@ -290,17 +297,19 @@ private:
         auto conf_th      = static_cast<float>(get_parameter("yolo.conf_threshold").as_double());
         auto iou_th       = static_cast<float>(get_parameter("yolo.iou_threshold").as_double());
         auto device       = get_parameter("yolo.device").as_string();
+        auto input_size   = get_parameter("yolo.input_size").as_int();
 
         yolo_detector_ = std::make_unique<YOLODetector>(
             model_path,
             model_type,
             conf_th,
             iou_th,
-            device);
+            device,
+            input_size);
 
         RCLCPP_INFO(get_logger(),
-                    "YOLODetector created: type=%s, conf=%.2f, iou=%.2f, device=%s",
-                    model_type.c_str(), conf_th, iou_th, device.c_str());
+                    "YOLODetector created: type=%s, conf=%.2f, iou=%.2f, device=%s, input=%d",
+                    model_type.c_str(), conf_th, iou_th, device.c_str(), input_size);
         const double detect_interval =
             get_parameter("yolo.detect_min_interval_sec").as_double();
         if (detect_interval > 0.0) {
@@ -655,7 +664,9 @@ private:
         const double detect_min_interval =
             get_parameter("yolo.detect_min_interval_sec").as_double();
         bool run_yolo = true;
-        if (detect_min_interval > 0.0 && has_last_yolo_run_time_) {
+        // KF 未锁定前必须每帧跑 YOLO 拿首帧 3D 测量；跳帧只适用于已初始化后的 predict
+        const bool kf_initialized = ball_tracker_->isInitialized();
+        if (detect_min_interval > 0.0 && has_last_yolo_run_time_ && kf_initialized) {
             const double since_last_yolo = (frame_time - last_yolo_run_time_).seconds();
             if (since_last_yolo < detect_min_interval) {
                 run_yolo = false;
@@ -816,7 +827,11 @@ private:
             }
         } else {
             if (!ball_found) {
-                last_measurement_block_reason_.clear();
+                if (run_yolo) {
+                    last_measurement_block_reason_ = fresh_det_block_reason;
+                } else {
+                    last_measurement_block_reason_.clear();
+                }
             }
         }
 
@@ -886,14 +901,32 @@ private:
 
             publishBallState(pos_world, vel_world);
 
+            publishBallPositionMarker(frame_time, pos_world);
+
             publishWorldTrajectory(frame_time, pos_world, vel_world);
+        } else {
+            clearBallPositionMarker();
         }
 
-        // 9) 生成并发布调试图像（对齐 Python: 用 volleyball_detections + best + kalman_state）
+        // 9) 调试图像（限频 + best_effort，减轻 RViz 卡顿）
         if (get_parameter("debug.enable").as_bool()) {
-            publishDebugImage(msg->header, frame, volleyball_detections,
-                              has_best ? &best_det : nullptr,
-                              frame_time);
+            const double max_hz =
+                get_parameter("debug.max_publish_hz").as_double();
+            bool publish_debug = true;
+            if (max_hz > 0.0 && last_debug_publish_time_.nanoseconds() > 0) {
+                const double interval = 1.0 / max_hz;
+                const double since =
+                    (frame_time - last_debug_publish_time_).seconds();
+                if (since < interval) {
+                    publish_debug = false;
+                }
+            }
+            if (publish_debug) {
+                publishDebugImage(msg->header, frame, volleyball_detections,
+                                  has_best ? &best_det : nullptr,
+                                  frame_time);
+                last_debug_publish_time_ = frame_time;
+            }
         }
 
         last_frame_time_ = frame_time;
@@ -988,6 +1021,48 @@ private:
         if (ball_tracker_) {
             ball_tracker_->reset();
         }
+        clearBallPositionMarker();
+    }
+
+    void publishBallPositionMarker(const rclcpp::Time& stamp,
+                                   const Eigen::Vector3d& pos_world)
+    {
+        visualization_msgs::msg::Marker m;
+        m.header.stamp = toMsgTime(stamp);
+        m.header.frame_id = world_frame_id_;
+        m.ns = "ball_kf_position";
+        m.id = 0;
+        m.type = visualization_msgs::msg::Marker::SPHERE;
+        m.action = visualization_msgs::msg::Marker::ADD;
+        m.pose.position.x = pos_world.x();
+        m.pose.position.y = pos_world.y();
+        m.pose.position.z = pos_world.z();
+        m.pose.orientation.w = 1.0;
+        const double diameter = std::max(
+            0.08, get_parameter("volleyball.diameter").as_double());
+        m.scale.x = diameter;
+        m.scale.y = diameter;
+        m.scale.z = diameter;
+        m.color.r = 1.0f;
+        m.color.g = 0.1f;
+        m.color.b = 0.1f;
+        m.color.a = 1.0f;
+        ball_marker_pub_->publish(m);
+        ball_marker_visible_ = true;
+    }
+
+    void clearBallPositionMarker()
+    {
+        if (!ball_marker_visible_) {
+            return;
+        }
+        visualization_msgs::msg::Marker m;
+        m.header.frame_id = world_frame_id_;
+        m.ns = "ball_kf_position";
+        m.id = 0;
+        m.action = visualization_msgs::msg::Marker::DELETE;
+        ball_marker_pub_->publish(m);
+        ball_marker_visible_ = false;
     }
 
     void publishBallState(const Eigen::Vector3d& pos,
@@ -1274,6 +1349,13 @@ private:
                         cv::FONT_HERSHEY_SIMPLEX, 0.55,
                         cv::Scalar(180, 180, 180), 2);
             info_y += 22;
+        } else if (!ball_tracker_->isInitialized()) {
+            cv::putText(debug_img,
+                        "YOLO: acquiring (KF boot)",
+                        cv::Point(10, info_y),
+                        cv::FONT_HERSHEY_SIMPLEX, 0.55,
+                        cv::Scalar(0, 200, 255), 2);
+            info_y += 22;
         }
 
         // 绘制状态信息（对齐 Python）
@@ -1422,12 +1504,15 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr traj_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ball_marker_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr debug_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ball_state_pub_;
     rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ball_prediction_pub_;
     rclcpp::Publisher<station_detector_cpp::msg::VolleyballIntercept>::SharedPtr intercept_pub_;
 
     rclcpp::Time last_frame_time_;
+    rclcpp::Time last_debug_publish_time_{0, 0, RCL_ROS_TIME};
+    bool ball_marker_visible_{false};
     rclcpp::Time last_detection_time_;
     bool last_detection_time_valid_;
 

@@ -23,6 +23,15 @@ fi
 
 ros_source
 
+# OpenCV 4.11 overlay cv_bridge（工控机源码装 OpenCV 后需要）
+CV_BRIDGE_OVERLAY="${CV_BRIDGE_OVERLAY:-$HOME/ros_cv_bridge_overlay}"
+if [[ -f "$CV_BRIDGE_OVERLAY/install/setup.bash" ]]; then
+  set +u
+  # shellcheck disable=SC1090
+  source "$CV_BRIDGE_OVERLAY/install/setup.bash"
+  set -u 2>/dev/null || true
+fi
+
 CUDNN_LIB="${CUDNN_LIB:-$HOME/opencv_build/cudnn/lib}"
 if [[ -f /usr/local/lib/libopencv_dnn.so ]]; then
   export LD_LIBRARY_PATH="/usr/local/lib:$CUDNN_LIB:${LD_LIBRARY_PATH:-}"
@@ -44,16 +53,31 @@ fi
 
 DEFAULT_VIDEO="$WS_PATH/src/station_detector_cpp/videos/test.mp4"
 DEFAULT_MODEL="$WS_PATH/src/station_detector_cpp/model/best.onnx"
+YOLO_INPUT_SIZE="${YOLO_INPUT_SIZE:-640}"
+
+if [[ "$YOLO_INPUT_SIZE" == "416" ]]; then
+  DEFAULT_MODEL="$WS_PATH/src/station_detector_cpp/model/best_416.onnx"
+fi
 
 VIDEO_PATH="${VIDEO_PATH:-$DEFAULT_VIDEO}"
 MODEL_PATH="${MODEL_PATH:-$DEFAULT_MODEL}"
 FRAME_RATE="${FRAME_RATE:-15.0}"
 YOLO_DEVICE="${YOLO_DEVICE:-auto}"
+if ! command -v nvidia-smi >/dev/null 2>&1; then
+  YOLO_DEVICE=cpu
+fi
 
 LAUNCH_CMD="ros2 launch station_detector_cpp yolo.launch.py \
   pipeline_mode:=$PIPELINE_MODE \
   model_path:=$MODEL_PATH \
   yolo_device:=$YOLO_DEVICE"
+
+if [[ "$PIPELINE_MODE" == "realsense" && "$YOLO_INPUT_SIZE" == "416" ]]; then
+  PARAMS_416="$WS_PATH/src/station_detector_cpp/config/ball_detector_params_realsense_416.yaml"
+  if [[ -f "$PARAMS_416" ]]; then
+    LAUNCH_CMD="$LAUNCH_CMD params_file:=$PARAMS_416"
+  fi
+fi
 
 if [[ "$PIPELINE_MODE" == "video" ]]; then
   LAUNCH_CMD="$LAUNCH_CMD video_path:=$VIDEO_PATH frame_rate:=$FRAME_RATE"

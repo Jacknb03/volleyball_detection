@@ -48,12 +48,14 @@ YOLODetector::YOLODetector(const std::string& model_path,
                            const std::string& model_type,
                            float conf_threshold,
                            float iou_threshold,
-                           const std::string& device)
+                           const std::string& device,
+                           int input_size)
     : model_path_(model_path),
       model_type_(model_type),
       conf_threshold_(conf_threshold),
       iou_threshold_(iou_threshold),
-      device_(device)
+      device_(device),
+      input_size_(input_size > 0 ? input_size : 640)
 {
     // 对标 Python: __init__ 记录参数 + 加载模型。
     // 这里使用 OpenCV DNN 加载 ONNX 模型（model_path 必须指向 .onnx）。
@@ -284,10 +286,9 @@ void YOLODetector::runModel(const cv::Mat& image,
     detections.clear();
     ensureNetInitialized();
 
-    // Typical YOLO ONNX export uses 640x640; to avoid redesign, keep fixed 640.
-    // If your export uses different size, adjust here to match the ONNX model.
-    const int inp_w = 640;
-    const int inp_h = 640;
+    // ONNX export input must match yolo.input_size (640 or 416, etc.)
+    const int inp_w = input_size_;
+    const int inp_h = input_size_;
 
     const float x_factor = static_cast<float>(image.cols) / static_cast<float>(inp_w);
     const float y_factor = static_cast<float>(image.rows) / static_cast<float>(inp_h);

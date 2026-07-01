@@ -198,6 +198,7 @@ ros2 topic echo /ball_intercept
 ⬜ 5. 接 D455i → PIPELINE_MODE=realsense ./start_all.sh
 ⬜ 6. 对比 bbox vs depth 的 Z 抖动和落点误差
 ⬜ 7. 上机器人：换真实 TF、标定、对接控制机（1260P/Jetson，见 DEPLOYMENT §五）
+⬜ 8. 视觉→执行端联调：按 [INTEGRATION_CHECKLIST.md](../../volleyball_executor/docs/INTEGRATION_CHECKLIST.md) 逐项 echo
 ```
 
 有问题时记录：`/debug_image` 截图、`ros2 topic hz` 输出、终端最后 20 行 log。

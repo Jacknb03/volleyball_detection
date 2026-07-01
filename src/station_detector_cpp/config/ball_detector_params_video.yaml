@@ -68,3 +68,4 @@ ball_detector_node:
       enable: true
       show_fps: true
       draw_trajectory: true
+      max_publish_hz: 12.0

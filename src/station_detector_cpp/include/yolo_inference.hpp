@@ -53,7 +53,8 @@ public:
                  const std::string& model_type = "yolov8",
                  float conf_threshold = 0.5f,
                  float iou_threshold  = 0.45f,
-                 const std::string& device = "auto");
+                 const std::string& device = "auto",
+                 int input_size = 640);
 
     virtual ~YOLODetector() = default;
 
@@ -105,6 +106,7 @@ public:
 
     float getConfThreshold() const { return conf_threshold_; }
     float getIouThreshold() const  { return iou_threshold_; }
+    int getInputSize() const { return input_size_; }
     const std::string& getModelType() const { return model_type_; }
     const std::string& getDevice() const     { return device_; }
     int getNumClasses() const { return num_classes_; }
@@ -131,6 +133,7 @@ protected:
     float        conf_threshold_;
     float        iou_threshold_;
     std::string device_;
+    int          input_size_;
 
     // OpenCV DNN backend (ONNX inference). This is the concrete inference path
     // used to match the Python YOLODetector.detect() behavior at runtime.
