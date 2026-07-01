@@ -242,7 +242,75 @@ ros2 topic hz /camera/camera/color/image_raw    # realsense 模式
 
 ---
 
-## 三、RealSense D455i 深度模式（驱动就绪后启用）
+## 工控机快速部署（新机器 / 第二台 IPC）
+
+> **推荐入口**：`bash scripts/deploy_ipc.sh`  
+> 完整联调：`src/volleyball_executor/docs/INTEGRATION_CHECKLIST.md`
+
+### 前提
+
+| 项目 | 要求 |
+|------|------|
+| 系统 | Ubuntu 22.04 x86_64 |
+| ROS | Humble 已 `source /opt/ros/humble/setup.bash` |
+| 硬件 | RealSense D455i（USB3）；**无 NVIDIA** |
+| 网络 | 能 `git clone` / `git pull`；OpenCV 编译需 GitHub 或离线 tar 包 |
+
+### 方式 A：已有 OpenCV 4.11 的机器（最快，~10 分钟）
+
+```bash
+# 1. 拉代码（或 git pull）
+git clone <repo> ~/volleyball_detection && cd ~/volleyball_detection
+# 或已在机器上: git pull
+
+# 2. 拷模型（*.onnx 不进 git）
+rsync -avz dev:volleyball_detection/src/station_detector_cpp/model/best_416.onnx \
+  src/station_detector_cpp/model/
+
+# 3. 一键编译
+bash scripts/deploy_ipc.sh
+
+# 4. 启动 + 自检
+./stop_all.sh && ./start_all.sh
+bash scripts/check_deploy.sh
+```
+
+### 方式 B：全新工控机（含 OpenCV 源码编译，数小时）
+
+```bash
+git clone <repo> ~/volleyball_detection && cd ~/volleyball_detection
+# 拷 best_416.onnx 到 src/station_detector_cpp/model/
+bash scripts/deploy_ipc.sh --full
+```
+
+`--full` 会依次：`install_realsense_deps.sh` → `install_opencv411_cpu.sh` → cv_bridge overlay → `colcon build`。
+
+### 方式 C：只更新代码（日常）
+
+```bash
+cd ~/volleyball_detection
+bash scripts/deploy_ipc.sh --pull
+# 等价于 git pull + 重编；比 rebuild_ipc.sh 多编 volleyball_executor
+```
+
+### 脚本对照
+
+| 脚本 | 何时用 |
+|------|--------|
+| **`deploy_ipc.sh`** | 新机器 / 全量部署 / pull 后重编三包 |
+| `rebuild_ipc.sh` | 只改了 `station_detector_cpp`，快速重编 |
+| `rebuild_vision_opencv411.sh` | OpenCV 刚装好，重编 cv_bridge + vision |
+| `check_deploy.sh` | 启动后看节点、话题 hz |
+| `install_opencv411_cpu.sh` | 仅装 OpenCV 4.11（deploy --full 会调） |
+
+### 常见坑
+
+1. **勿拷开发机的 `install/`**（symlink-install 在工控机上坏链接）
+2. **必须有 `best_416.onnx`**，`pipeline.conf` 默认 `YOLO_INPUT_SIZE=416`
+3. **OpenCV 4.5 + 4.11 混链** → cv_bridge 崩溃；务必 overlay + `LD_LIBRARY_PATH=/usr/local/lib`
+4. 相机 busy → `./stop_all.sh` 或 `pkill -9 -f realsense`
+
+---
 
 ### 3.1 安装驱动
 

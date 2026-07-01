@@ -467,8 +467,10 @@ volleyball_detection/
 ├── run.sh                       # 免手敲 source 跑 ros2 命令
 ├── config/volleyball_debug.rviz # debug 图 + 3D 球点 Marker
 ├── scripts/
+│   ├── deploy_ipc.sh            # ★ 新工控机一键部署（推荐入口）
+│   ├── check_deploy.sh          # 部署后自检
 │   ├── install_realsense_deps.sh
-│   ├── rebuild_ipc.sh           # 工控机本地 colcon（避免坏 symlink）
+│   ├── rebuild_ipc.sh           # 仅重编 vision 包（改 C++ 后）
 │   ├── rebuild_vision_opencv411.sh
 │   └── rebuild_cv_bridge_opencv411.sh
 └── src/
