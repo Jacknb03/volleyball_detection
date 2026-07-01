@@ -1,0 +1,10 @@
+# 复制为 pipeline.local.conf（不进 git），覆盖 pipeline.conf 里的项
+# cp config/pipeline.local.conf.example config/pipeline.local.conf
+
+# --- 启动哪些进程 ---
+START_RVIZ=false              # 工控机无桌面可关
+START_EXECUTOR=true           # intercept_bridge → /vision/stewart_target
+
+# --- 机器差异（可选）---
+# YOLO_DEVICE=cpu
+# CV_BRIDGE_OVERLAY=$HOME/ros_cv_bridge_overlay

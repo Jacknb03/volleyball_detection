@@ -27,6 +27,9 @@ models/
 ## Runtime debug outputs
 debug_images/
 
-## Teammate vendor copy (reference only; use src/volleyball_msgs for interfaces)
+## Per-machine overrides (copy from pipeline.local.conf.example)
+config/pipeline.local.conf
+
+## Teammate vendor copy
 universal_controllers_v2-main/
 universal_controllers*/

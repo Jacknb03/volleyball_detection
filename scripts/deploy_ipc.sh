@@ -8,8 +8,7 @@
 #   bash scripts/deploy_ipc.sh --full       # 新机器从零：RealSense apt + OpenCV 4.11 源码编译 + 全量编译（数小时）
 #   bash scripts/deploy_ipc.sh --skip-opencv  # 跳过 cv_bridge overlay（系统 OpenCV 4.5 会崩，不推荐）
 #
-# 模型文件 *.onnx 不进 git，需从开发机拷:
-#   rsync -avz src/station_detector_cpp/model/best_416.onnx USER@IPC:~/volleyball_detection/src/station_detector_cpp/model/
+# 模型文件 *.onnx 不进 git；从 GitHub Release 或 scripts/download_models.sh 获取
 #
 set -eo pipefail
 
@@ -63,6 +62,7 @@ check_opencv411() {
 
 check_models() {
   log "ONNX 模型"
+  bash "$WS/scripts/download_models.sh" 2>/dev/null || true
   local ok=true
   for f in best.onnx best_416.onnx; do
     local p="$WS/src/station_detector_cpp/model/$f"
@@ -75,8 +75,9 @@ check_models() {
   done
   if [[ "$ok" != true ]]; then
     echo ""
-    echo "从开发机拷贝示例:"
-    echo "  rsync -avz src/station_detector_cpp/model/best_416.onnx USER@本机IP:$WS/src/station_detector_cpp/model/"
+    echo "下载: bash scripts/download_models.sh"
+    echo "或 rsync: bash scripts/sync_to_ipc.sh USER@IPC --deploy"
+    echo "Release 需先发布 tag=${MODEL_RELEASE_TAG:-v0.1-models}（见 config/models.conf）"
     return 1
   fi
   return 0

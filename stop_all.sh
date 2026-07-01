@@ -1,21 +1,21 @@
 #!/bin/bash
-# 关闭 ./start_all.sh 或 ros2 launch station_detector_cpp yolo*.launch.py 拉起的进程
+# 关闭 ./start_all.sh 拉起的视觉 / 桥接 / RViz
 
 set -u
 
 echo "正在关闭排球检测相关节点..."
 
-# 按优先级：先停 launch 监督进程，再停各节点（避免 launch 还在时子进程被拉起）
 PATTERNS=(
   'ros2 launch station_detector_cpp yolo\.launch\.py'
+  'ros2 launch volleyball_executor executor\.launch\.py'
   'ball_detector_node'
   'video_publisher'
   'realsense2_camera_node'
+  'intercept_bridge_node'
   'static_transform_publisher.*--frame-id base_link --child-frame-id camera_optical_frame'
   'static_transform_publisher.*--frame-id base_link --child-frame-id camera_color_optical_frame'
   'static_transform_publisher.*--frame-id base_link --child-frame-id camera_link'
   'static_transform_publisher.*--frame-id odom --child-frame-id camera'
-  'intercept_bridge_node'
   'rviz2 -d.*volleyball_debug\.rviz'
 )
 
@@ -34,13 +34,13 @@ stop_patterns -9
 
 REMAINING=$(
   pgrep -af \
-    'ros2 launch station_detector_cpp yolo|ball_detector_node|video_publisher|realsense2_camera_node|static_transform_publisher.*--frame-id (base_link|odom)|intercept_bridge_node|rviz2 -d.*volleyball_debug' \
+    'yolo\.launch|ball_detector|realsense2_camera|intercept_bridge|rviz2.*volleyball_debug' \
     2>/dev/null | grep -v pgrep || true
 )
 
 if [[ -n "$REMAINING" ]]; then
   echo ""
-  echo "警告：以下进程可能仍在运行（请手动检查）："
+  echo "警告：以下进程可能仍在运行："
   echo "$REMAINING"
   exit 1
 fi
